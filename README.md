@@ -58,8 +58,8 @@ All pipeline components are in `scripts/`:
 ln -sf "$(pwd)/scripts/claude-usage-log" ~/.local/bin/claude-usage-log
 ln -sf "$(pwd)/scripts/claude-usage-build" ~/.local/bin/claude-usage-build
 
-# Install LaunchAgent (edit paths in plist first if your home dir differs)
-cp scripts/com.openclaw.claude-usage-log.plist ~/Library/LaunchAgents/
+# Install LaunchAgent (replaces __HOME__ placeholder with your home dir)
+sed "s|__HOME__|$HOME|g" scripts/com.openclaw.claude-usage-log.plist > ~/Library/LaunchAgents/com.openclaw.claude-usage-log.plist
 launchctl load ~/Library/LaunchAgents/com.openclaw.claude-usage-log.plist
 ```
 
