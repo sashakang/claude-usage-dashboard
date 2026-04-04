@@ -35,7 +35,7 @@ Claude's API has rate limits — a 5-hour session window and a 7-day weekly wind
 
 Paste this into Claude Code:
 
-> Install https://github.com/sashakang/claude-usage-dashboard — clone to ~/claude-usage-dashboard, symlink both scripts from scripts/ into ~/.local/bin, install the launchd plist (sed \_\_HOME\_\_ → $HOME, then launchctl load), run claude-usage-build to verify. Make sure ~/.local/bin exists and is in PATH.
+> Install https://github.com/sashakang/claude-usage-dashboard — clone to ~/claude-usage-dashboard, symlink both scripts from scripts/ into ~/.local/bin, install the launchd plist (sed \_\_HOME\_\_ → $HOME, then launchctl load), run claude-usage-log to fetch initial data and verify. Make sure ~/.local/bin exists and is in PATH.
 
 ### Manual install
 
