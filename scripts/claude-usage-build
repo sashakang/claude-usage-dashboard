@@ -5,12 +5,19 @@
 
 set -euo pipefail
 
-# Resolve symlinks to find the real script location (works when symlinked into PATH)
-REAL_SCRIPT="$(readlink "$0" 2>/dev/null || echo "$0")"
-# Handle relative symlinks
-case "$REAL_SCRIPT" in /*) ;; *) REAL_SCRIPT="$(cd "$(dirname "$0")" && pwd)/$REAL_SCRIPT" ;; esac
-SCRIPT_DIR="$(cd "$(dirname "$REAL_SCRIPT")" && pwd)"
-PROJ_DIR="$(cd "$SCRIPT_DIR/.." && pwd)"
+# Resolve symlinks to find the real script location (works when symlinked or copied)
+PROJ_DIR="$(python3 -c "
+import os, sys
+script = os.path.realpath(sys.argv[1])
+print(os.path.dirname(os.path.dirname(script)))
+" "$0" 2>/dev/null)" || PROJ_DIR=""
+
+# Fallback: search common locations for template.html
+if [ ! -f "$PROJ_DIR/template.html" ]; then
+  for d in "$HOME/claude-usage-dashboard" "$HOME/Projects/claude-usage-dashboard"; do
+    if [ -f "$d/template.html" ]; then PROJ_DIR="$d"; break; fi
+  done
+fi
 
 LOG_FILE="${1:-$HOME/.claude/projects/claude-usage-dashboard/claude-usage.jsonl}"
 TEMPLATE="$PROJ_DIR/template.html"
