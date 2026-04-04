@@ -2,7 +2,7 @@
 
 Self-hosted monitoring dashboard for Claude API rate-limit consumption. Tracks 5-hour session, 7-day weekly, and Sonnet usage windows with burn rate analysis.
 
-![Dashboard](https://img.shields.io/badge/status-active-brightgreen)
+![Dashboard](screenshots/dashboard-full.png)
 
 ## How It Works
 
@@ -20,6 +20,18 @@ The generated `index.html` is fully self-contained — no server needed, just op
 - **Burn rate plots** — instantaneous consumption rate (%/h) per window, with gap detection to filter sleep/downtime artifacts
 - **Stats** — burn rate, estimated exhaustion time, peak session usage, weekly reset countdown
 - **Alerts** — warning at 50% weekly, critical at 80%
+
+### Usage Plots
+
+| Session (5h) | Weekly (7d) | Sonnet |
+|:---:|:---:|:---:|
+| ![Session](screenshots/session-5h-window.png) | ![Weekly](screenshots/weekly-7d-window.png) | ![Sonnet](screenshots/sonnet-weekly.png) |
+
+### Burn Rate Plots
+
+| Session | Weekly | Sonnet |
+|:---:|:---:|:---:|
+| ![Session Burn](screenshots/session-burn-rate-pct-h.png) | ![Weekly Burn](screenshots/weekly-burn-rate-pct-h.png) | ![Sonnet Burn](screenshots/sonnet-burn-rate-pct-h.png) |
 
 ## Files
 
