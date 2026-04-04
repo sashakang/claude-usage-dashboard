@@ -41,15 +41,27 @@ The generated `index.html` is fully self-contained — no server needed, just op
 | `index.html` | Generated artifact (gitignored) |
 | `serve.py` | Optional dev server on port 8766 |
 
-## External Dependencies
+## Scripts
 
-These live outside this repo:
+All pipeline components are in `scripts/`:
 
-| Script | Location | Purpose |
-|--------|----------|---------|
-| `claude-usage-log` | `~/.local/bin/` | Fetches API data, appends to JSONL, triggers build |
-| `claude-usage-build` | `~/.local/bin/` | Reads JSONL + template, writes index.html, rotates data (7d retention) |
-| LaunchAgent | `~/Library/LaunchAgents/com.openclaw.claude-usage-log.plist` | Runs collector every 5 min |
+| File | Purpose |
+|------|---------|
+| `scripts/claude-usage-log` | Fetches API data, appends to JSONL, triggers build |
+| `scripts/claude-usage-build` | Reads JSONL + template, writes index.html, rotates data (7d retention) |
+| `scripts/com.openclaw.claude-usage-log.plist` | macOS LaunchAgent — runs collector every 5 min |
+
+### Install
+
+```bash
+# Symlink scripts into PATH
+ln -sf "$(pwd)/scripts/claude-usage-log" ~/.local/bin/claude-usage-log
+ln -sf "$(pwd)/scripts/claude-usage-build" ~/.local/bin/claude-usage-build
+
+# Install LaunchAgent (edit paths in plist first if your home dir differs)
+cp scripts/com.openclaw.claude-usage-log.plist ~/Library/LaunchAgents/
+launchctl load ~/Library/LaunchAgents/com.openclaw.claude-usage-log.plist
+```
 
 ## Usage
 

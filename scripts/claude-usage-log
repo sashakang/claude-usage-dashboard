@@ -1,0 +1,52 @@
+#!/bin/bash
+# Claude Usage Logger - appends usage snapshot + rebuilds static dashboard
+# Designed to run via launchd every 5 minutes
+
+set -euo pipefail
+
+LOG_DIR="$HOME/.openclaw/workspace/usage-logs"
+mkdir -p "$LOG_DIR"
+
+LOG_FILE="$LOG_DIR/claude-usage.jsonl"
+
+# Get token from Keychain
+TOKEN=$(security find-generic-password -s "Claude Code-credentials" -w 2>/dev/null \
+  | python3 -c "import sys,json; print(json.loads(sys.stdin.read())['claudeAiOauth']['accessToken'])" 2>/dev/null) || {
+  echo '{"error":"keychain_read_failed","ts":"'$(date -u +%Y-%m-%dT%H:%M:%SZ)'"}' >> "$LOG_FILE"
+  exit 1
+}
+
+# Fetch usage
+RAW=$(curl -s --max-time 10 "https://api.anthropic.com/api/oauth/usage" \
+  -H "Authorization: Bearer $TOKEN" \
+  -H "anthropic-beta: oauth-2025-04-20" 2>/dev/null) || {
+  echo '{"error":"api_call_failed","ts":"'$(date -u +%Y-%m-%dT%H:%M:%SZ)'"}' >> "$LOG_FILE"
+  exit 1
+}
+
+# Append timestamped record
+python3 -c "
+import json, sys
+from datetime import datetime, timezone
+
+raw = '''$RAW'''
+try:
+    d = json.loads(raw)
+except:
+    d = {'error': 'parse_failed', 'raw': raw[:200]}
+
+record = {
+    'ts': datetime.now(timezone.utc).isoformat(),
+    'five_hour': d.get('five_hour', {}).get('utilization'),
+    'five_hour_resets': d.get('five_hour', {}).get('resets_at'),
+    'seven_day': d.get('seven_day', {}).get('utilization'),
+    'seven_day_resets': d.get('seven_day', {}).get('resets_at'),
+    'sonnet': d.get('seven_day_sonnet', {}).get('utilization') if d.get('seven_day_sonnet') else None,
+    'opus': d.get('seven_day_opus', {}).get('utilization') if d.get('seven_day_opus') else None,
+    'extra_enabled': d.get('extra_usage', {}).get('is_enabled', False),
+}
+print(json.dumps(record))
+" >> "$LOG_FILE"
+
+# Rebuild static dashboard
+claude-usage-build "$LOG_FILE" 2>&1 || echo "warning: dashboard build failed" >&2

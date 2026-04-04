@@ -1,0 +1,70 @@
+#!/bin/bash
+# Rebuild Claude Usage Dashboard from JSONL data + template
+# Can be run standalone (after template edits) or called by claude-usage-log
+
+set -euo pipefail
+
+LOG_FILE="${1:-$HOME/.openclaw/workspace/usage-logs/claude-usage.jsonl}"
+TEMPLATE="$HOME/Projects/claude-usage-dashboard/template.html"
+DASHBOARD="$HOME/Projects/claude-usage-dashboard/index.html"
+
+if [ ! -f "$TEMPLATE" ]; then
+  echo "error: template not found: $TEMPLATE" >&2
+  exit 1
+fi
+
+if [ ! -f "$LOG_FILE" ]; then
+  echo "error: data file not found: $LOG_FILE" >&2
+  exit 1
+fi
+
+python3 -c "
+import json, sys, os
+from datetime import datetime, timezone, timedelta
+
+log_file = '$LOG_FILE'
+cutoff = (datetime.now(timezone.utc) - timedelta(days=7)).isoformat()
+
+lines = open(log_file).read().strip().split('\n')
+keep = []
+archive = []
+for l in lines:
+    try:
+        r = json.loads(l)
+        if 'error' in r:
+            continue
+        if r.get('ts', '') < cutoff:
+            archive.append(l)
+        else:
+            keep.append(r)
+    except:
+        pass
+
+# Archive old records
+if archive:
+    archive_dir = os.path.dirname(log_file)
+    archive_file = os.path.join(archive_dir, 'claude-usage-archive.jsonl')
+    with open(archive_file, 'a') as f:
+        f.write('\n'.join(archive) + '\n')
+    # Rewrite active file with only recent records
+    with open(log_file, 'w') as f:
+        for r in keep:
+            f.write(json.dumps(r) + '\n')
+    print(f'Rotated: archived {len(archive)} old records, kept {len(keep)}', file=sys.stderr)
+
+if not keep:
+    print('warning: no valid records in data file', file=sys.stderr)
+
+data_json = json.dumps(keep, separators=(',',':'))
+template = open('$TEMPLATE').read()
+
+if '__DATA_PLACEHOLDER__' not in template:
+    print('error: __DATA_PLACEHOLDER__ not found in template', file=sys.stderr)
+    sys.exit(1)
+
+html = template.replace('__DATA_PLACEHOLDER__', data_json)
+with open('$DASHBOARD', 'w') as f:
+    f.write(html)
+
+print(f'Built dashboard: {len(keep)} records → $DASHBOARD')
+"
