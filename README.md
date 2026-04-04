@@ -1,25 +1,17 @@
 # Claude Usage Dashboard
 
-Self-hosted monitoring dashboard for Claude API rate-limit consumption. Tracks 5-hour session, 7-day weekly, and Sonnet usage windows with burn rate analysis.
+Ever wonder how much of your Claude allowance you've burned through? This dashboard tracks it for you.
+
+Claude's API has rate limits — a 5-hour session window and a 7-day weekly window. This tool polls your usage every 5 minutes and builds a visual dashboard so you can see exactly where you stand, how fast you're burning, and when your limits reset.
 
 ![Dashboard](screenshots/dashboard-full.png)
 
-## How It Works
+## What You See
 
-A launchd job runs every 5 minutes:
-1. **Fetches** usage data from the Claude OAuth API (`/api/oauth/usage`)
-2. **Appends** a timestamped record to a JSONL log file
-3. **Builds** a static HTML dashboard by injecting the data into `template.html`
-
-The generated `index.html` is fully self-contained — no server needed, just open it in a browser.
-
-## Dashboard Features
-
-- **Usage cards** — remaining % for session (5h), weekly (7d), and Sonnet windows with color-coded alerts
-- **Usage plots** — each window scoped to its actual time boundaries with a linear pace reference line
-- **Burn rate plots** — instantaneous consumption rate (%/h) per window, with gap detection to filter sleep/downtime artifacts
-- **Stats** — burn rate, estimated exhaustion time, peak session usage, weekly reset countdown
-- **Alerts** — warning at 50% weekly, critical at 80%
+- **Usage cards** at the top — how much is left in each window, color-coded (green/yellow/red)
+- **Usage plots** — your consumption over time with a diagonal "even pace" reference line
+- **Burn rate plots** — how fast you're consuming right now (%/hour) with a horizontal "sustainable pace" line
+- **Alerts** — warnings when you're approaching limits
 
 ### Usage Plots
 
@@ -33,55 +25,69 @@ The generated `index.html` is fully self-contained — no server needed, just op
 |:---:|:---:|:---:|
 | ![Session Burn](screenshots/session-burn-rate-pct-h.png) | ![Weekly Burn](screenshots/weekly-burn-rate-pct-h.png) | ![Sonnet Burn](screenshots/sonnet-burn-rate-pct-h.png) |
 
-## Files
+## Requirements
 
-| File | Purpose |
-|------|---------|
-| `template.html` | Source of truth — edit this |
-| `index.html` | Generated artifact (gitignored) |
-| `serve.py` | Optional dev server on port 8766 |
+- **macOS** (uses launchd for scheduling and Keychain for auth)
+- **Claude Code** installed and logged in (the OAuth token is read from your Keychain)
+- **Python 3**
 
-## Scripts
-
-All pipeline components are in `scripts/`:
-
-| File | Purpose |
-|------|---------|
-| `scripts/claude-usage-log` | Fetches API data, appends to JSONL, triggers build |
-| `scripts/claude-usage-build` | Reads JSONL + template, writes index.html, rotates data (7d retention) |
-| `scripts/com.claude-usage.log.plist` | macOS LaunchAgent — runs collector every 5 min |
-
-### Install
+## Install
 
 ```bash
-# Symlink scripts into PATH
+git clone https://github.com/sashakang/claude-usage-dashboard.git
+cd claude-usage-dashboard
+
+# Make sure ~/.local/bin exists and is in your PATH
+mkdir -p ~/.local/bin
+
+# Symlink scripts
 ln -sf "$(pwd)/scripts/claude-usage-log" ~/.local/bin/claude-usage-log
 ln -sf "$(pwd)/scripts/claude-usage-build" ~/.local/bin/claude-usage-build
 
-# Install LaunchAgent (replaces __HOME__ placeholder with your home dir)
+# Install the scheduled job (runs every 5 minutes)
 sed "s|__HOME__|$HOME|g" scripts/com.claude-usage.log.plist > ~/Library/LaunchAgents/com.claude-usage.log.plist
 launchctl load ~/Library/LaunchAgents/com.claude-usage.log.plist
 ```
 
+Data is stored in `~/.claude/projects/claude-usage-dashboard/`.
+
 ## Usage
 
-**View the dashboard:**
+**Open the dashboard:**
 ```bash
 open index.html
-# or
+```
+
+**Or run a local server:**
+```bash
 python3 serve.py  # http://localhost:8766
 ```
 
-**Rebuild after editing template:**
+**Rebuild after editing the template:**
 ```bash
 claude-usage-build
 ```
 
-**Check current usage from CLI:**
-```bash
-TOKEN=$(security find-generic-password -s "Claude Code-credentials" -w | python3 -c "import sys,json; print(json.load(sys.stdin)['claudeAiOauth']['accessToken'])")
-curl -s -H "Authorization: Bearer $TOKEN" -H "anthropic-beta: oauth-2025-04-20" "https://api.anthropic.com/api/oauth/usage" | python3 -m json.tool
-```
+## How It Works
+
+A launchd job runs `claude-usage-log` every 5 minutes:
+1. Reads your OAuth token from the macOS Keychain
+2. Fetches usage from `https://api.anthropic.com/api/oauth/usage`
+3. Appends a timestamped record to a JSONL file (with 7-day rotation)
+4. Calls `claude-usage-build` which bakes the data into `template.html` and writes `index.html`
+
+The dashboard is a single static HTML file — no backend needed, just open it in a browser.
+
+## Project Structure
+
+| File | Purpose |
+|------|---------|
+| `template.html` | Dashboard source — edit this |
+| `index.html` | Generated (gitignored) |
+| `serve.py` | Optional dev server (port 8766) |
+| `scripts/claude-usage-log` | Collector: fetch, rotate, append |
+| `scripts/claude-usage-build` | Builder: JSONL + template -> HTML |
+| `scripts/com.claude-usage.log.plist` | macOS LaunchAgent (5-min schedule) |
 
 ## Data Format
 
