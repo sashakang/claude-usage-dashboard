@@ -52,12 +52,17 @@ RAW=$(curl -s --max-time 10 "https://api.anthropic.com/api/oauth/usage" \
   exit 1
 }
 
-# Append timestamped record — pass API response via stdin, not string interpolation
-echo "$RAW" | python3 -c "
-import json, sys
-from datetime import datetime, timezone
+# Rotate old records (>7d) before appending — safe because this is the sole writer
+# Then append the new record. Both operations in one Python call to avoid gaps.
+echo "$RAW" | python3 - "$LOG_FILE" <<'PYEOF'
+import json, sys, os, tempfile
+from datetime import datetime, timezone, timedelta
 
+log_file = sys.argv[1]
 raw = sys.stdin.read()
+cutoff = (datetime.now(timezone.utc) - timedelta(days=7)).isoformat()
+
+# Parse new record
 try:
     d = json.loads(raw)
 except:
@@ -73,8 +78,43 @@ record = {
     'opus': d.get('seven_day_opus', {}).get('utilization') if d.get('seven_day_opus') else None,
     'extra_enabled': d.get('extra_usage', {}).get('is_enabled', False),
 }
-print(json.dumps(record))
-" >> "$LOG_FILE"
+
+# Read existing, split into keep vs archive
+keep = []
+archive = []
+if os.path.exists(log_file):
+    for l in open(log_file).read().strip().split('\n'):
+        if not l:
+            continue
+        try:
+            r = json.loads(l)
+            if 'error' in r:
+                continue
+            if r.get('ts', '') >= cutoff:
+                keep.append(l)
+            else:
+                archive.append(l)
+        except:
+            pass
+
+# Archive old records
+if archive:
+    archive_file = os.path.join(os.path.dirname(log_file), 'claude-usage-archive.jsonl')
+    with open(archive_file, 'a') as f:
+        f.write('\n'.join(archive) + '\n')
+    print(f'Rotated: archived {len(archive)} old records', file=sys.stderr)
+
+# Write kept records + new record atomically
+keep.append(json.dumps(record))
+fd, tmp = tempfile.mkstemp(dir=os.path.dirname(log_file), suffix='.tmp')
+try:
+    with os.fdopen(fd, 'w') as f:
+        f.write('\n'.join(keep) + '\n')
+    os.rename(tmp, log_file)
+except:
+    os.unlink(tmp)
+    raise
+PYEOF
 
 # Rebuild static dashboard
 claude-usage-build "$LOG_FILE" 2>&1 || echo "warning: dashboard build failed" >&2
