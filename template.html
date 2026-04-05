@@ -62,7 +62,7 @@
 <body>
 
 <h1>⚡ Claude Usage Dashboard</h1>
-<div class="subtitle">Static file · Rebuilt every 5 min by launchd</div>
+<div class="subtitle">Static file · Rebuilt every 10 min by launchd</div>
 
 <div id="alert" class="alert">⚠️ <span id="alert-text"></span></div>
 
@@ -105,7 +105,7 @@
 </div>
 
 <div class="chart-box">
-  <div class="chart-title">🔥 Session Burn Rate (%/5m)</div>
+  <div class="chart-title">🔥 Session Burn Rate (%/10m)</div>
   <div class="chart-wrap-sm"><canvas id="burnSessionChart"></canvas></div>
 </div>
 
@@ -187,7 +187,7 @@ if (data.length) {
   const timeScale = {type:'time',time:{tooltipFormat:'MMM d, HH:mm'},grid:{color:'#1e1e2e'},ticks:{color:'#666'}};
   const pctScale = {min:0,max:100,grid:{color:'#1e1e2e'},ticks:{color:'#666',callback:v=>v+'%'}};
   const burnYScale = {grid:{color:'#1e1e2e'},ticks:{color:'#666',callback:v=>v.toFixed(1)+'%/h'}};
-  const burn5mYScale = {grid:{color:'#1e1e2e'},ticks:{color:'#666',callback:v=>v.toFixed(0)+'%/5m'}};
+  const burn10mYScale = {grid:{color:'#1e1e2e'},ticks:{color:'#666',callback:v=>v.toFixed(0)+'%/10m'}};
 
   // 5h x-axis (hourly gridlines)
   function xScale5h(start, end) {
@@ -241,7 +241,7 @@ if (data.length) {
       labels = filtered.map(r=>new Date(r.ts)); values = filtered.map(r=>r[field]);
     }
     const xScales = windowH <= 5 ? xScale5h(start, end) : xScale7d(start, end);
-    const evenRate = doHourly ? 100 / windowH : 100 / (windowH * 12); // %/h or %/5min
+    const evenRate = doHourly ? 100 / windowH : 100 / (windowH * 6); // %/h or %/10min
     const allLabels = [start, ...labels, end];
     const allValues = [null, ...values, null];
     new Chart(document.getElementById(canvasId), {
@@ -250,7 +250,7 @@ if (data.length) {
           {label:field,data:allValues,borderColor:color,backgroundColor:bgColor,fill:true,tension:0,pointRadius:3,pointBackgroundColor:color},
           {label:'Even pace',data:allLabels.map(()=>evenRate),borderColor:'#ffffff55',borderDash:[6,4],borderWidth:1,pointRadius:0,fill:false}
         ]
-      }, options: {responsive:true,maintainAspectRatio:false,scales:{...xScales,y:doHourly?burnYScale:burn5mYScale},plugins:{legend:{display:false}}}
+      }, options: {responsive:true,maintainAspectRatio:false,scales:{...xScales,y:doHourly?burnYScale:burn10mYScale},plugins:{legend:{display:false}}}
     });
   }
 
@@ -282,7 +282,7 @@ if (data.length) {
   makeBurnChart('burnWeeklyChart', L.seven_day_resets, 168, rates, 'weekly', '#f97316', 'rgba(249,115,22,0.1)', true, 'seven_day');
   makeBurnChart('burnSonnetChart', L.seven_day_resets, 168, rates, 'sonnet', '#a78bfa', 'rgba(167,139,250,0.1)', true, 'sonnet');
 
-  document.getElementById('footer').textContent = 'Last update: '+new Date(L.ts).toLocaleString()+' · '+data.length+' points · File regenerated every 5 min';
+  document.getElementById('footer').textContent = 'Last update: '+new Date(L.ts).toLocaleString()+' · '+data.length+' points · File regenerated every 10 min';
 }
 </script>
 </body>

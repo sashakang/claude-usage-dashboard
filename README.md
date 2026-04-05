@@ -2,7 +2,7 @@
 
 Ever wonder how much of your Claude allowance you've burned through? This dashboard tracks it for you.
 
-Claude's API has rate limits — a 5-hour session window and a 7-day weekly window. This tool polls your usage every 5 minutes and builds a visual dashboard so you can see exactly where you stand, how fast you're burning, and when your limits reset.
+Claude's API has rate limits — a 5-hour session window and a 7-day weekly window. This tool polls your usage every 10 minutes and builds a visual dashboard so you can see exactly where you stand, how fast you're burning, and when your limits reset.
 
 ![Dashboard](screenshots/dashboard-full.png)
 
@@ -50,7 +50,7 @@ mkdir -p ~/.local/bin
 ln -sf "$(pwd)/scripts/claude-usage-log" ~/.local/bin/claude-usage-log
 ln -sf "$(pwd)/scripts/claude-usage-build" ~/.local/bin/claude-usage-build
 
-# Install the scheduled job (runs every 5 minutes)
+# Install the scheduled job (runs every 10 minutes)
 sed "s|__HOME__|$HOME|g" scripts/com.claude-usage.log.plist > ~/Library/LaunchAgents/com.claude-usage.log.plist
 launchctl load ~/Library/LaunchAgents/com.claude-usage.log.plist
 ```
@@ -76,7 +76,7 @@ claude-usage-build
 
 ## How It Works
 
-A launchd job runs `claude-usage-log` every 5 minutes:
+A launchd job runs `claude-usage-log` every 10 minutes:
 1. Reads your OAuth token from the macOS Keychain
 2. Fetches usage from `https://api.anthropic.com/api/oauth/usage`
 3. Appends a timestamped record to a JSONL file (with 7-day rotation)
@@ -93,7 +93,7 @@ The dashboard is a single static HTML file — no backend needed, just open it i
 | `serve.py` | Optional dev server (port 8766) |
 | `scripts/claude-usage-log` | Collector: fetch, rotate, append |
 | `scripts/claude-usage-build` | Builder: JSONL + template -> HTML |
-| `scripts/com.claude-usage.log.plist` | macOS LaunchAgent (5-min schedule) |
+| `scripts/com.claude-usage.log.plist` | macOS LaunchAgent (10-min schedule) |
 
 ## Data Format
 
