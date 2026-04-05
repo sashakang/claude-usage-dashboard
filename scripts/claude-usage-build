@@ -48,6 +48,8 @@ for l in lines:
         r = json.loads(l)
         if 'error' in r:
             continue
+        if r.get('seven_day') is None and r.get('five_hour') is None:
+            continue
         if r.get('ts', '') >= cutoff:
             records.append(r)
     except:

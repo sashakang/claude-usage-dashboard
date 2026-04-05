@@ -132,7 +132,8 @@
 <div class="footer" id="footer"></div>
 
 <script>
-const data = __DATA_PLACEHOLDER__;
+const rawData = __DATA_PLACEHOLDER__;
+const data = rawData.filter(d => d.seven_day != null || d.five_hour != null);
 if (!data.length) { document.getElementById('footer').textContent = 'No data yet'; }
 
 function col(p) { return p < 50 ? '#4ade80' : p < 80 ? '#fbbf24' : '#f87171'; }
@@ -250,9 +251,12 @@ if (data.length) {
   for (let i=1;i<data.length;i++) {
     const dt=(new Date(data[i].ts)-new Date(data[i-1].ts))/3600000;
     if(dt<=0 || dt>0.5)continue;
-    const sDelta = (data[i].five_hour??0)-(data[i-1].five_hour??0);
-    const wDelta = (data[i].seven_day??0)-(data[i-1].seven_day??0);
-    const snDelta = (data[i].sonnet??0)-(data[i-1].sonnet??0);
+    const s0=data[i-1].five_hour, s1=data[i].five_hour;
+    const w0=data[i-1].seven_day, w1=data[i].seven_day;
+    const n0=data[i-1].sonnet, n1=data[i].sonnet;
+    const sDelta = (s0!=null && s1!=null) ? s1-s0 : 0;
+    const wDelta = (w0!=null && w1!=null) ? w1-w0 : 0;
+    const snDelta = (n0!=null && n1!=null) ? n1-n0 : 0;
     rates.push({ts:data[i].ts, session: sDelta > 0 ? sDelta/dt : 0, weekly: wDelta > 0 ? wDelta/dt : 0, sonnet: snDelta > 0 ? snDelta/dt : 0});
   }
 
