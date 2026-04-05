@@ -105,7 +105,7 @@
 </div>
 
 <div class="chart-box">
-  <div class="chart-title">🔥 Session Burn Rate (%/h)</div>
+  <div class="chart-title">🔥 Session Burn Rate (%/15m)</div>
   <div class="chart-wrap-sm"><canvas id="burnSessionChart"></canvas></div>
 </div>
 
@@ -187,6 +187,7 @@ if (data.length) {
   const timeScale = {type:'time',time:{tooltipFormat:'MMM d, HH:mm'},grid:{color:'#1e1e2e'},ticks:{color:'#666'}};
   const pctScale = {min:0,max:100,grid:{color:'#1e1e2e'},ticks:{color:'#666',callback:v=>v+'%'}};
   const burnYScale = {grid:{color:'#1e1e2e'},ticks:{color:'#666',callback:v=>v.toFixed(1)+'%/h'}};
+  const burn15mYScale = {grid:{color:'#1e1e2e'},ticks:{color:'#666',callback:v=>v.toFixed(1)+'%/15m'}};
 
   // 5h x-axis (hourly gridlines)
   function xScale5h(start, end) {
@@ -228,7 +229,7 @@ if (data.length) {
       // One delta per hour: last value in this hour minus last value in previous hour
       const inWindow = data.filter(d => { const t = new Date(d.ts); return t >= start && t <= end && d[rawField] != null; });
       const hourBins = {};
-      inWindow.forEach(d => { const t = new Date(d.ts); t.setMinutes(0,0,0); const k = t.getTime(); hourBins[k] = d[rawField]; }); // last value wins
+      inWindow.forEach(d => { const t = new Date(d.ts); t.setMinutes(0,0,0); const k = t.getTime(); hourBins[k] = d[rawField]; });
       const hours = Object.keys(hourBins).map(Number).sort((a,b)=>a-b);
       labels = []; values = [];
       for (let h = 1; h < hours.length; h++) {
@@ -240,7 +241,7 @@ if (data.length) {
       labels = filtered.map(r=>new Date(r.ts)); values = filtered.map(r=>r[field]);
     }
     const xScales = windowH <= 5 ? xScale5h(start, end) : xScale7d(start, end);
-    const evenRate = 100 / windowH;
+    const evenRate = doHourly ? 100 / windowH : 100 / (windowH * 4); // %/h or %/15min
     const allLabels = [start, ...labels, end];
     const allValues = [null, ...values, null];
     new Chart(document.getElementById(canvasId), {
@@ -249,7 +250,7 @@ if (data.length) {
           {label:field,data:allValues,borderColor:color,backgroundColor:bgColor,fill:true,tension:0,pointRadius:3,pointBackgroundColor:color},
           {label:'Even pace',data:allLabels.map(()=>evenRate),borderColor:'#ffffff55',borderDash:[6,4],borderWidth:1,pointRadius:0,fill:false}
         ]
-      }, options: {responsive:true,maintainAspectRatio:false,scales:{...xScales,y:burnYScale},plugins:{legend:{display:false}}}
+      }, options: {responsive:true,maintainAspectRatio:false,scales:{...xScales,y:doHourly?burnYScale:burn15mYScale},plugins:{legend:{display:false}}}
     });
   }
 
@@ -265,27 +266,24 @@ if (data.length) {
   for (let i=1;i<data.length;i++) {
     const dt=(new Date(data[i].ts)-new Date(data[i-1].ts))/3600000;
     if(dt<0.05 || dt>0.5)continue; // skip <3min (noisy) and >30min (gaps)
-    // Session: look back ~1h for smoothing
+    // Session: look back ~15min for smoothing
     // Detect window resets by five_hour dropping (more robust than comparing resets timestamps)
     let sessionRate = 0;
     const now = new Date(data[i].ts);
     if (data[i].five_hour != null) {
-      // Walk back up to 1h, stop if we hit a gap or a window reset (five_hour drops)
+      // Walk back up to 15min, stop if we hit a gap or a window reset (five_hour drops)
       let j = i;
       for (let k = i; k >= 1; k--) {
         const gap = (new Date(data[k].ts) - new Date(data[k-1].ts)) / 3600000;
         if (gap > 0.5) break; // downtime gap
         if (data[k-1].five_hour == null) break;
         if (data[k-1].five_hour > data[k].five_hour) break; // window reset (value dropped)
-        if ((now - new Date(data[k-1].ts)) / 3600000 > 1) break; // beyond 1h
+        if ((now - new Date(data[k-1].ts)) / 3600000 > 0.25) break; // beyond 15min
         j = k - 1;
       }
       if (j < i && data[j].five_hour != null) {
-        const hrsBack = (now - new Date(data[j].ts)) / 3600000;
-        if (hrsBack > 0) {
-          const d = data[i].five_hour - data[j].five_hour;
-          sessionRate = d > 0 ? d / hrsBack : 0;
-        }
+        const d = data[i].five_hour - data[j].five_hour;
+        sessionRate = d > 0 ? d : 0; // delta per ~15min = %/15min
       }
     }
     // Weekly/Sonnet: consecutive deltas
