@@ -98,7 +98,6 @@ record = {
     'seven_day': d.get('seven_day', {}).get('utilization'),
     'seven_day_resets': d.get('seven_day', {}).get('resets_at'),
     'sonnet': d.get('seven_day_sonnet', {}).get('utilization') if d.get('seven_day_sonnet') else None,
-    'opus': d.get('seven_day_opus', {}).get('utilization') if d.get('seven_day_opus') else None,
     'extra_enabled': d.get('extra_usage', {}).get('is_enabled', False),
 }
 

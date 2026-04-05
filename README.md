@@ -106,7 +106,6 @@ Each JSONL record:
   "seven_day": 13.0,
   "seven_day_resets": "2026-04-09T05:00:00Z",
   "sonnet": 0.0,
-  "opus": null,
   "extra_enabled": true
 }
 ```

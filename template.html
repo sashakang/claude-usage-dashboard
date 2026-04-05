@@ -157,8 +157,11 @@ if (data.length) {
   document.getElementById('dp-det').textContent = 'over '+spanH+'h';
 
   // Alert
-  if (L.seven_day >= 80) { document.getElementById('alert-text').textContent = 'CRITICAL: Weekly at '+L.seven_day+'%!'; document.getElementById('alert').className = 'alert show'; }
-  else if (L.seven_day >= 50) { document.getElementById('alert-text').textContent = 'Warning: Weekly at '+L.seven_day+'%'; document.getElementById('alert').className = 'alert show'; }
+  if (L.seven_day >= 50) {
+    const sev = L.seven_day >= 80 ? 'CRITICAL' : 'Warning';
+    document.getElementById('alert-text').textContent = sev+': Weekly at '+L.seven_day+'%';
+    document.getElementById('alert').className = 'alert show';
+  }
 
   // Stats
   const rec = data.filter(d=>d.seven_day!=null).slice(-12);
