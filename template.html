@@ -216,17 +216,23 @@ if (data.length) {
   }
 
   // Burn rate chart factory
-  function makeBurnChart(canvasId, resetTs, windowH, rateData, field, color, bgColor, doHourly) {
+  function makeBurnChart(canvasId, resetTs, windowH, rateData, field, color, bgColor, doHourly, rawField) {
     if (!resetTs) return;
     const end = new Date(resetTs), start = new Date(end - windowH*3600000);
     let filtered = rateData.filter(r => { const t = new Date(r.ts); return t >= start && t <= end; });
     let labels, values;
     if (doHourly) {
-      const buckets = {};
-      filtered.forEach(r => { const d = new Date(r.ts); d.setMinutes(0,0,0); const k = d.getTime(); if (!buckets[k]) buckets[k]={ts:d,sum:0,n:0}; buckets[k].sum+=r[field]; buckets[k].n++; });
-      const hourly = Object.values(buckets).sort((a,b)=>a.ts-b.ts);
-      if (hourly.length > 1) hourly.shift(); // drop first bucket (partial — no prior context)
-      labels = hourly.map(h=>h.ts); values = hourly.map(h=>h.sum/h.n);
+      // One delta per hour: last value in this hour minus last value in previous hour
+      const inWindow = data.filter(d => { const t = new Date(d.ts); return t >= start && t <= end && d[rawField] != null; });
+      const hourBins = {};
+      inWindow.forEach(d => { const t = new Date(d.ts); t.setMinutes(0,0,0); const k = t.getTime(); hourBins[k] = d[rawField]; }); // last value wins
+      const hours = Object.keys(hourBins).map(Number).sort((a,b)=>a-b);
+      labels = []; values = [];
+      for (let h = 1; h < hours.length; h++) {
+        const delta = hourBins[hours[h]] - hourBins[hours[h-1]];
+        labels.push(new Date(hours[h]));
+        values.push(delta > 0 ? delta : 0);
+      }
     } else {
       labels = filtered.map(r=>new Date(r.ts)); values = filtered.map(r=>r[field]);
     }
@@ -289,8 +295,8 @@ if (data.length) {
 
   // Burn rate charts
   makeBurnChart('burnSessionChart', L.five_hour_resets, 5, rates, 'session', '#60a5fa', 'rgba(96,165,250,0.1)', false);
-  makeBurnChart('burnWeeklyChart', L.seven_day_resets, 168, rates, 'weekly', '#f97316', 'rgba(249,115,22,0.1)', true);
-  makeBurnChart('burnSonnetChart', L.seven_day_resets, 168, rates, 'sonnet', '#a78bfa', 'rgba(167,139,250,0.1)', true);
+  makeBurnChart('burnWeeklyChart', L.seven_day_resets, 168, rates, 'weekly', '#f97316', 'rgba(249,115,22,0.1)', true, 'seven_day');
+  makeBurnChart('burnSonnetChart', L.seven_day_resets, 168, rates, 'sonnet', '#a78bfa', 'rgba(167,139,250,0.1)', true, 'sonnet');
 
   document.getElementById('footer').textContent = 'Last update: '+new Date(L.ts).toLocaleString()+' · '+data.length+' points · File regenerated every 5 min';
 }
