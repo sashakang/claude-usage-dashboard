@@ -225,6 +225,7 @@ if (data.length) {
       const buckets = {};
       filtered.forEach(r => { const d = new Date(r.ts); d.setMinutes(0,0,0); const k = d.getTime(); if (!buckets[k]) buckets[k]={ts:d,sum:0,n:0}; buckets[k].sum+=r[field]; buckets[k].n++; });
       const hourly = Object.values(buckets).sort((a,b)=>a.ts-b.ts);
+      if (hourly.length > 1) hourly.shift(); // drop first bucket (partial — no prior context)
       labels = hourly.map(h=>h.ts); values = hourly.map(h=>h.sum/h.n);
     } else {
       labels = filtered.map(r=>new Date(r.ts)); values = filtered.map(r=>r[field]);
