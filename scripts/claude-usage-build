@@ -69,17 +69,6 @@ for l in lines:
 if skipped:
     print(f'warning: skipped {skipped} unparseable lines', file=sys.stderr)
 
-# Backfill 'default' accounts with the actual account from newest record of same service
-acct_map = {}
-for r in records:
-    svc = r.get('service', 'claude')
-    acct = r.get('account', 'default')
-    if acct != 'default':
-        acct_map[svc] = acct
-for r in records:
-    if r.get('account') == 'default' and r.get('service', 'claude') in acct_map:
-        r['account'] = acct_map[r.get('service', 'claude')]
-
 if not records:
     print('warning: no valid records in data file', file=sys.stderr)
 

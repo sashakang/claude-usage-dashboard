@@ -157,14 +157,34 @@ function makeBurnChart(canvas, data, resetTs, windowH, rateData, field, color, b
 }
 
 // ── Group data by service:account ──
+// First pass: collect all records, tracking known accounts per service
 const groups = {};
+const svcAccounts = {}; // service → Set of non-default accounts
 rawData.forEach(d => {
   if (d.seven_day == null && d.five_hour == null) return;
   const svc = d.service || 'claude';
   const acct = d.account || 'default';
+  if (acct !== 'default') {
+    if (!svcAccounts[svc]) svcAccounts[svc] = new Set();
+    svcAccounts[svc].add(acct);
+  }
   const key = svc + ':' + acct;
   if (!groups[key]) groups[key] = {service: svc, account: acct, data: []};
   groups[key].data.push(d);
+});
+// Merge "default" into the real account only when exactly one exists for that service
+Object.keys(groups).forEach(key => {
+  const g = groups[key];
+  if (g.account !== 'default') return;
+  const known = svcAccounts[g.service];
+  if (known && known.size === 1) {
+    const realAcct = [...known][0];
+    const targetKey = g.service + ':' + realAcct;
+    if (!groups[targetKey]) groups[targetKey] = {service: g.service, account: realAcct, data: []};
+    groups[targetKey].data.push(...g.data);
+    groups[targetKey].data.sort((a,b) => a.ts.localeCompare(b.ts));
+    delete groups[key];
+  }
 });
 
 const keys = Object.keys(groups);
