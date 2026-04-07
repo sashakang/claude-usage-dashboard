@@ -73,6 +73,11 @@ if [ "$GOOD" != "true" ]; then
   exit 1
 fi
 
+# Fetch Claude profile for account identity
+CLAUDE_PROFILE=$(curl -s --max-time 5 "https://api.anthropic.com/api/oauth/profile" \
+  -H "Authorization: Bearer $TOKEN" \
+  -H "anthropic-beta: oauth-2025-04-20" 2>/dev/null) || CLAUDE_PROFILE=""
+
 # Fetch OpenAI Codex usage (best-effort — failure doesn't block Claude logging)
 CODEX_RAW=""
 CODEX_AUTH="$HOME/.codex/auth.json"
@@ -93,9 +98,10 @@ if [ -f "$CODEX_AUTH" ]; then
 fi
 
 # Rotate old records (>7d) before appending — safe because this is the sole writer
-# Then append the new record. Both operations in one Python call to avoid gaps.
+# Then append new records. Both operations in one Python call to avoid gaps.
 # Pass API responses via env vars (not stdin — heredoc uses stdin for the script source)
 export CLAUDE_RAW="$RAW"
+export CLAUDE_PROFILE
 export CODEX_RAW
 python3 - "$LOG_FILE" <<'PYEOF'
 import json, sys, os, tempfile
@@ -103,42 +109,58 @@ from datetime import datetime, timezone, timedelta
 
 log_file = sys.argv[1]
 raw = os.environ.get('CLAUDE_RAW', '')
+claude_profile = os.environ.get('CLAUDE_PROFILE', '')
 codex_raw = os.environ.get('CODEX_RAW', '')
 cutoff = (datetime.now(timezone.utc) - timedelta(days=7)).isoformat()
+now = datetime.now(timezone.utc).isoformat()
 
-# Parse Claude record
+# Parse Claude account email
+claude_account = 'unknown'
+try:
+    p = json.loads(claude_profile)
+    claude_account = p.get('account', {}).get('email', 'unknown')
+except:
+    pass
+
+# Parse Claude usage
 try:
     d = json.loads(raw)
 except:
     d = {'error': 'parse_failed', 'raw': raw[:200]}
 
-# Parse Codex record
-cx = {}
-if codex_raw:
-    try:
-        cx_data = json.loads(codex_raw)
-        rl = cx_data.get('rate_limit', {})
-        pw = rl.get('primary_window', {})
-        sw = rl.get('secondary_window', {})
-        cx = {
-            'codex_five_hour': pw.get('used_percent'),
-            'codex_five_hour_resets': datetime.fromtimestamp(pw['reset_at'], tz=timezone.utc).isoformat() if pw.get('reset_at') else None,
-            'codex_seven_day': sw.get('used_percent'),
-            'codex_seven_day_resets': datetime.fromtimestamp(sw['reset_at'], tz=timezone.utc).isoformat() if sw.get('reset_at') else None,
-        }
-    except:
-        pass
+records = []
 
-record = {
-    'ts': datetime.now(timezone.utc).isoformat(),
+# Claude record
+records.append({
+    'ts': now,
+    'service': 'claude',
+    'account': claude_account,
     'five_hour': d.get('five_hour', {}).get('utilization'),
     'five_hour_resets': d.get('five_hour', {}).get('resets_at'),
     'seven_day': d.get('seven_day', {}).get('utilization'),
     'seven_day_resets': d.get('seven_day', {}).get('resets_at'),
     'sonnet': d.get('seven_day_sonnet', {}).get('utilization') if d.get('seven_day_sonnet') else None,
     'extra_enabled': d.get('extra_usage', {}).get('is_enabled', False),
-    **cx,
-}
+})
+
+# Codex record (if available)
+if codex_raw:
+    try:
+        cx = json.loads(codex_raw)
+        rl = cx.get('rate_limit', {})
+        pw = rl.get('primary_window', {})
+        sw = rl.get('secondary_window', {})
+        records.append({
+            'ts': now,
+            'service': 'codex',
+            'account': cx.get('email', 'unknown'),
+            'five_hour': pw.get('used_percent'),
+            'five_hour_resets': datetime.fromtimestamp(pw['reset_at'], tz=timezone.utc).isoformat() if pw.get('reset_at') else None,
+            'seven_day': sw.get('used_percent'),
+            'seven_day_resets': datetime.fromtimestamp(sw['reset_at'], tz=timezone.utc).isoformat() if sw.get('reset_at') else None,
+        })
+    except:
+        pass
 
 # Read existing, split into keep vs archive
 keep = []
@@ -165,8 +187,9 @@ if archive:
         f.write('\n'.join(archive) + '\n')
     print(f'Rotated: archived {len(archive)} old records', file=sys.stderr)
 
-# Write kept records + new record atomically
-keep.append(json.dumps(record))
+# Write kept records + new records atomically
+for rec in records:
+    keep.append(json.dumps(rec))
 fd, tmp = tempfile.mkstemp(dir=os.path.dirname(log_file), suffix='.tmp')
 try:
     with os.fdopen(fd, 'w') as f:

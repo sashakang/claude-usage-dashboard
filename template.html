@@ -57,7 +57,7 @@
   }
   .alert.show { display: block; }
   .footer { text-align: center; color: #555; font-size: 0.75em; margin-top: 24px; }
-  .tabs { display: flex; justify-content: center; gap: 8px; margin-bottom: 24px; }
+  .tabs { display: flex; justify-content: center; gap: 8px; margin-bottom: 24px; flex-wrap: wrap; }
   .tab-btn {
     padding: 8px 24px; border-radius: 8px; border: 1px solid #2a2a3a;
     background: #1a1a24; color: #888; cursor: pointer; font-size: 0.95em; font-weight: 600;
@@ -74,148 +74,14 @@
 <h1>⚡ Usage Dashboard</h1>
 <div class="subtitle">Static file · Rebuilt every 10 min by launchd</div>
 
-<div class="tabs">
-  <button class="tab-btn active" onclick="switchTab('claude')">Claude</button>
-  <button class="tab-btn" onclick="switchTab('codex')">Codex</button>
-</div>
-
-<!-- Claude Tab -->
-<div id="tab-claude" class="tab-content active">
-
-<div id="alert" class="alert">⚠️ <span id="alert-text"></span></div>
-
-<div class="cards">
-  <div class="card">
-    <div class="label">Session (5h)</div>
-    <div class="value" id="s-val">--</div>
-    <div class="detail" id="s-det"></div>
-    <div class="bar-wrap"><div class="bar-fill" id="s-bar"></div></div>
-  </div>
-  <div class="card">
-    <div class="label">Weekly (All)</div>
-    <div class="value" id="w-val">--</div>
-    <div class="detail" id="w-det"></div>
-    <div class="bar-wrap"><div class="bar-fill" id="w-bar"></div></div>
-  </div>
-  <div class="card">
-    <div class="label">Sonnet (Weekly)</div>
-    <div class="value" id="sn-val">--</div>
-    <div class="detail" id="sn-det"></div>
-    <div class="bar-wrap"><div class="bar-fill" id="sn-bar"></div></div>
-  </div>
-  <div class="card">
-    <div class="label">Data Points</div>
-    <div class="value" id="dp-val">--</div>
-    <div class="detail" id="dp-det"></div>
-  </div>
-</div>
-
-<div class="stats-row">
-  <div class="stat-box"><div class="sl">Burn Rate (weekly/hr)</div><div class="sv" id="burn">--</div></div>
-  <div class="stat-box"><div class="sl">Est. Weekly Exhaustion</div><div class="sv" id="exhaust">--</div></div>
-  <div class="stat-box"><div class="sl">Peak Session Usage</div><div class="sv" id="peak">--</div></div>
-  <div class="stat-box"><div class="sl">Weekly Reset</div><div class="sv" id="reset">--</div></div>
-</div>
-
-<div class="chart-box">
-  <div class="chart-title">⏱ Session (5h Window)</div>
-  <div class="chart-wrap"><canvas id="sessionChart"></canvas></div>
-</div>
-
-<div class="chart-box">
-  <div class="chart-title">🔥 Session Burn Rate (%/10m)</div>
-  <div class="chart-wrap-sm"><canvas id="burnSessionChart"></canvas></div>
-</div>
-
-<div class="chart-box">
-  <div class="chart-title">📅 Weekly (7d Window)</div>
-  <div class="chart-wrap"><canvas id="weeklyChart"></canvas></div>
-</div>
-
-<div class="chart-box">
-  <div class="chart-title">🔥 Weekly Burn Rate (%/h)</div>
-  <div class="chart-wrap-sm"><canvas id="burnWeeklyChart"></canvas></div>
-</div>
-
-<div class="chart-box">
-  <div class="chart-title">💎 Sonnet (Weekly)</div>
-  <div class="chart-wrap"><canvas id="sonnetChart"></canvas></div>
-</div>
-
-<div class="chart-box">
-  <div class="chart-title">🔥 Sonnet Burn Rate (%/h)</div>
-  <div class="chart-wrap-sm"><canvas id="burnSonnetChart"></canvas></div>
-</div>
-
-</div><!-- /tab-claude -->
-
-<!-- Codex Tab -->
-<div id="tab-codex" class="tab-content">
-
-<div id="cx-alert" class="alert">⚠️ <span id="cx-alert-text"></span></div>
-
-<div class="cards">
-  <div class="card">
-    <div class="label">Session (5h)</div>
-    <div class="value" id="cx-s-val">--</div>
-    <div class="detail" id="cx-s-det"></div>
-    <div class="bar-wrap"><div class="bar-fill" id="cx-s-bar"></div></div>
-  </div>
-  <div class="card">
-    <div class="label">Weekly (7d)</div>
-    <div class="value" id="cx-w-val">--</div>
-    <div class="detail" id="cx-w-det"></div>
-    <div class="bar-wrap"><div class="bar-fill" id="cx-w-bar"></div></div>
-  </div>
-  <div class="card">
-    <div class="label">Data Points</div>
-    <div class="value" id="cx-dp-val">--</div>
-    <div class="detail" id="cx-dp-det"></div>
-  </div>
-</div>
-
-<div class="stats-row">
-  <div class="stat-box"><div class="sl">Burn Rate (weekly/hr)</div><div class="sv" id="cx-burn">--</div></div>
-  <div class="stat-box"><div class="sl">Est. Weekly Exhaustion</div><div class="sv" id="cx-exhaust">--</div></div>
-  <div class="stat-box"><div class="sl">Peak Session Usage</div><div class="sv" id="cx-peak">--</div></div>
-  <div class="stat-box"><div class="sl">Weekly Reset</div><div class="sv" id="cx-reset">--</div></div>
-</div>
-
-<div class="chart-box">
-  <div class="chart-title">⏱ Session (5h Window)</div>
-  <div class="chart-wrap"><canvas id="cxSessionChart"></canvas></div>
-</div>
-
-<div class="chart-box">
-  <div class="chart-title">🔥 Session Burn Rate (%/10m)</div>
-  <div class="chart-wrap-sm"><canvas id="cxBurnSessionChart"></canvas></div>
-</div>
-
-<div class="chart-box">
-  <div class="chart-title">📅 Weekly (7d Window)</div>
-  <div class="chart-wrap"><canvas id="cxWeeklyChart"></canvas></div>
-</div>
-
-<div class="chart-box">
-  <div class="chart-title">🔥 Weekly Burn Rate (%/h)</div>
-  <div class="chart-wrap-sm"><canvas id="cxBurnWeeklyChart"></canvas></div>
-</div>
-
-</div><!-- /tab-codex -->
-
+<div class="tabs" id="tabs"></div>
+<div id="content"></div>
 <div class="footer" id="footer"></div>
 
 <script>
-function switchTab(tab) {
-  document.querySelectorAll('.tab-btn').forEach(b => b.classList.toggle('active', b.textContent.toLowerCase() === tab));
-  document.querySelectorAll('.tab-content').forEach(t => t.classList.toggle('active', t.id === 'tab-'+tab));
-}
-
 const rawData = __DATA_PLACEHOLDER__;
-const data = rawData.filter(d => d.seven_day != null || d.five_hour != null);
-const cxData = rawData.filter(d => d.codex_seven_day != null || d.codex_five_hour != null);
-if (!data.length && !cxData.length) { document.getElementById('footer').textContent = 'No data yet'; }
 
+// ── Helpers ──
 function col(p) { return p < 50 ? '#4ade80' : p < 80 ? '#fbbf24' : '#f87171'; }
 function cls(p) { return p < 50 ? 'green' : p < 80 ? 'yellow' : 'red'; }
 function ttl(iso) {
@@ -223,8 +89,9 @@ function ttl(iso) {
   const d = new Date(iso) - new Date(); if (d < 0) return 'expired';
   const h = d/3600000; return h > 24 ? (h/24).toFixed(1)+'d' : Math.floor(h)+'h '+Math.floor((d%3600000)/60000)+'m';
 }
+function esc(s) { return s.replace(/[^a-zA-Z0-9]/g, '_'); }
 
-// Charts — shared config
+// ── Chart config ──
 const timeScale = {type:'time',time:{tooltipFormat:'MMM d, HH:mm'},grid:{color:'#1e1e2e'},ticks:{color:'#666'}};
 const pctScale = {min:0,max:100,grid:{color:'#1e1e2e'},ticks:{color:'#666',callback:v=>v+'%'}};
 const burnYScale = {grid:{color:'#1e1e2e'},ticks:{color:'#666',callback:v=>v.toFixed(1)+'%/h'}};
@@ -240,19 +107,174 @@ function xScale7d(start, end) {
   };
 }
 
-if (data.length) {
-  const L = data[data.length-1];
-  [{id:'s',v:L.five_hour,r:L.five_hour_resets},{id:'w',v:L.seven_day,r:L.seven_day_resets},{id:'sn',v:L.sonnet,r:L.seven_day_resets}].forEach(x => {
-    const p = x.v ?? 0, left = 100-p;
-    const el = document.getElementById(x.id+'-val'); el.textContent = left.toFixed(0)+'%'; el.className = 'value '+cls(p);
-    document.getElementById(x.id+'-det').textContent = p+'% used · resets '+ttl(x.r);
-    const b = document.getElementById(x.id+'-bar'); b.style.width = p+'%'; b.style.background = col(p);
+function makeUsageChart(canvas, data, resetTs, windowH, field, color, bgColor) {
+  if (!resetTs) return;
+  const end = new Date(resetTs), start = new Date(end - windowH*3600000);
+  const filtered = data.filter(d => { const t = new Date(d.ts); return t >= start && t <= end; });
+  const xScales = windowH <= 5 ? xScale5h(start, end) : xScale7d(start, end);
+  new Chart(canvas, {
+    type:'line', data: {
+      labels: [start, ...filtered.map(d=>new Date(d.ts)), end],
+      datasets: [
+        {label:field,data:[null, ...filtered.map(d=>d[field]??0), null],borderColor:color,backgroundColor:bgColor,fill:true,tension:0.3,pointRadius:2},
+        {label:'Linear pace',data:[0, ...filtered.map(()=>null), 100],borderColor:'#ffffff55',borderDash:[6,4],borderWidth:1,pointRadius:0,fill:false,tension:0,spanGaps:true}
+      ]
+    }, options: {responsive:true,maintainAspectRatio:false,scales:{...xScales,y:{...pctScale}},plugins:{legend:{display:false}}}
   });
-  document.getElementById('dp-val').textContent = data.length;
-  const spanH = ((new Date(L.ts)-new Date(data[0].ts))/3600000).toFixed(1);
-  document.getElementById('dp-det').textContent = 'over '+spanH+'h';
+}
 
-  // Alert: warn when usage exceeds linear pace or >90%
+function makeBurnChart(canvas, data, resetTs, windowH, rateData, field, color, bgColor, doHourly, rawField) {
+  if (!resetTs) return;
+  const end = new Date(resetTs), start = new Date(end - windowH*3600000);
+  let labels, values;
+  if (doHourly) {
+    const inWindow = data.filter(d => { const t = new Date(d.ts); return t >= start && t <= end && d[rawField] != null; });
+    const hourBins = {};
+    inWindow.forEach(d => { const t = new Date(d.ts); t.setMinutes(0,0,0); const k = t.getTime(); hourBins[k] = d[rawField]; });
+    const hours = Object.keys(hourBins).map(Number).sort((a,b)=>a-b);
+    labels = []; values = [];
+    for (let h = 1; h < hours.length; h++) {
+      const delta = hourBins[hours[h]] - hourBins[hours[h-1]];
+      labels.push(new Date(hours[h]));
+      values.push(delta > 0 ? delta : 0);
+    }
+  } else {
+    const filtered = rateData.filter(r => { const t = new Date(r.ts); return t >= start && t <= end; });
+    labels = filtered.map(r=>new Date(r.ts)); values = filtered.map(r=>r[field]);
+  }
+  const xScales = windowH <= 5 ? xScale5h(start, end) : xScale7d(start, end);
+  const evenRate = doHourly ? 100 / windowH : 100 / (windowH * 6);
+  const allLabels = [start, ...labels, end];
+  const allValues = [null, ...values, null];
+  new Chart(canvas, {
+    type:'line', data: { labels: allLabels,
+      datasets:[
+        {label:field,data:allValues,borderColor:color,backgroundColor:bgColor,fill:true,tension:0,pointRadius:3,pointBackgroundColor:color},
+        {label:'Even pace',data:allLabels.map(()=>evenRate),borderColor:'#ffffff55',borderDash:[6,4],borderWidth:1,pointRadius:0,fill:false}
+      ]
+    }, options: {responsive:true,maintainAspectRatio:false,scales:{...xScales,y:doHourly?burnYScale:burn10mYScale},plugins:{legend:{display:false}}}
+  });
+}
+
+// ── Group data by service:account ──
+const groups = {};
+rawData.forEach(d => {
+  if (d.seven_day == null && d.five_hour == null) return;
+  const svc = d.service || 'claude';
+  const acct = d.account || 'default';
+  const key = svc + ':' + acct;
+  if (!groups[key]) groups[key] = {service: svc, account: acct, data: []};
+  groups[key].data.push(d);
+});
+
+const keys = Object.keys(groups);
+if (!keys.length) { document.getElementById('footer').textContent = 'No data yet'; }
+
+// Color palettes per service
+const palette = {
+  claude: {session: ['#60a5fa','rgba(96,165,250,0.1)'], weekly: ['#f97316','rgba(249,115,22,0.1)'], sonnet: ['#a78bfa','rgba(167,139,250,0.1)']},
+  codex:  {session: ['#10b981','rgba(16,185,129,0.1)'], weekly: ['#f59e0b','rgba(245,158,11,0.1)']},
+};
+function getPalette(svc) { return palette[svc] || palette.claude; }
+
+// ── Tab label: "Service (user)" — deduplicate if only one account per service ──
+const serviceCounts = {};
+keys.forEach(k => { const s = groups[k].service; serviceCounts[s] = (serviceCounts[s]||0) + 1; });
+function tabLabel(g) {
+  const name = g.service.charAt(0).toUpperCase() + g.service.slice(1);
+  if (serviceCounts[g.service] <= 1) return name;
+  const user = g.account.replace(/@.*/, '');
+  return name + ' (' + user + ')';
+}
+
+// ── Build tabs and content ──
+const tabsEl = document.getElementById('tabs');
+const contentEl = document.getElementById('content');
+
+function switchTab(key) {
+  document.querySelectorAll('.tab-btn').forEach(b => b.classList.toggle('active', b.dataset.key === key));
+  document.querySelectorAll('.tab-content').forEach(t => t.classList.toggle('active', t.id === 'tab-'+esc(key)));
+}
+
+keys.forEach((key, idx) => {
+  const g = groups[key];
+  const data = g.data;
+  const L = data[data.length-1];
+  const p = getPalette(g.service);
+  const id = esc(key);
+  const hasSonnet = g.service === 'claude' && data.some(d => d.sonnet != null);
+
+  // Tab button
+  const btn = document.createElement('button');
+  btn.className = 'tab-btn' + (idx === 0 ? ' active' : '');
+  btn.textContent = tabLabel(g);
+  btn.dataset.key = key;
+  btn.onclick = () => switchTab(key);
+  tabsEl.appendChild(btn);
+
+  // Tab content
+  const tab = document.createElement('div');
+  tab.id = 'tab-' + id;
+  tab.className = 'tab-content' + (idx === 0 ? ' active' : '');
+
+  // Build cards HTML
+  let cardsHtml = `
+    <div class="alert" id="alert-${id}">⚠️ <span id="alert-text-${id}"></span></div>
+    <div class="cards">
+      <div class="card">
+        <div class="label">Session (5h)</div>
+        <div class="value ${cls(L.five_hour??0)}">${(100-(L.five_hour??0)).toFixed(0)}%</div>
+        <div class="detail">${L.five_hour??0}% used · resets ${ttl(L.five_hour_resets)}</div>
+        <div class="bar-wrap"><div class="bar-fill" style="width:${L.five_hour??0}%;background:${col(L.five_hour??0)}"></div></div>
+      </div>
+      <div class="card">
+        <div class="label">Weekly (7d)</div>
+        <div class="value ${cls(L.seven_day??0)}">${(100-(L.seven_day??0)).toFixed(0)}%</div>
+        <div class="detail">${L.seven_day??0}% used · resets ${ttl(L.seven_day_resets)}</div>
+        <div class="bar-wrap"><div class="bar-fill" style="width:${L.seven_day??0}%;background:${col(L.seven_day??0)}"></div></div>
+      </div>`;
+  if (hasSonnet) {
+    cardsHtml += `
+      <div class="card">
+        <div class="label">Sonnet (Weekly)</div>
+        <div class="value ${cls(L.sonnet??0)}">${(100-(L.sonnet??0)).toFixed(0)}%</div>
+        <div class="detail">${L.sonnet??0}% used · resets ${ttl(L.seven_day_resets)}</div>
+        <div class="bar-wrap"><div class="bar-fill" style="width:${L.sonnet??0}%;background:${col(L.sonnet??0)}"></div></div>
+      </div>`;
+  }
+  cardsHtml += `
+      <div class="card">
+        <div class="label">Data Points</div>
+        <div class="value">${data.length}</div>
+        <div class="detail">over ${((new Date(L.ts)-new Date(data[0].ts))/3600000).toFixed(1)}h</div>
+      </div>
+    </div>`;
+
+  // Stats row
+  cardsHtml += `
+    <div class="stats-row">
+      <div class="stat-box"><div class="sl">Burn Rate (weekly/hr)</div><div class="sv" id="burn-${id}">--</div></div>
+      <div class="stat-box"><div class="sl">Est. Weekly Exhaustion</div><div class="sv" id="exhaust-${id}">--</div></div>
+      <div class="stat-box"><div class="sl">Peak Session Usage</div><div class="sv" id="peak-${id}">--</div></div>
+      <div class="stat-box"><div class="sl">Weekly Reset</div><div class="sv" id="reset-${id}">--</div></div>
+    </div>`;
+
+  // Charts
+  cardsHtml += `
+    <div class="chart-box"><div class="chart-title">⏱ Session (5h Window)</div><div class="chart-wrap"><canvas id="session-${id}"></canvas></div></div>
+    <div class="chart-box"><div class="chart-title">🔥 Session Burn Rate (%/10m)</div><div class="chart-wrap-sm"><canvas id="burnSession-${id}"></canvas></div></div>
+    <div class="chart-box"><div class="chart-title">📅 Weekly (7d Window)</div><div class="chart-wrap"><canvas id="weekly-${id}"></canvas></div></div>
+    <div class="chart-box"><div class="chart-title">🔥 Weekly Burn Rate (%/h)</div><div class="chart-wrap-sm"><canvas id="burnWeekly-${id}"></canvas></div></div>`;
+  if (hasSonnet) {
+    cardsHtml += `
+    <div class="chart-box"><div class="chart-title">💎 Sonnet (Weekly)</div><div class="chart-wrap"><canvas id="sonnet-${id}"></canvas></div></div>
+    <div class="chart-box"><div class="chart-title">🔥 Sonnet Burn Rate (%/h)</div><div class="chart-wrap-sm"><canvas id="burnSonnet-${id}"></canvas></div></div>`;
+  }
+
+  tab.innerHTML = cardsHtml;
+  contentEl.appendChild(tab);
+
+  // ── Alerts ──
   const alerts = [];
   if (L.seven_day_resets) {
     const resetMs = new Date(L.seven_day_resets).getTime();
@@ -265,232 +287,70 @@ if (data.length) {
   if (L.seven_day >= 90) alerts.push('Weekly usage at '+L.seven_day+'%');
   if (L.five_hour >= 90) alerts.push('Session usage at '+L.five_hour+'%');
   if (alerts.length) {
-    document.getElementById('alert-text').textContent = alerts.join(' · ');
-    document.getElementById('alert').className = 'alert show';
+    document.getElementById('alert-text-'+id).textContent = alerts.join(' · ');
+    document.getElementById('alert-'+id).className = 'alert show';
   }
 
-  // Stats
+  // ── Stats ──
   const rec = data.filter(d=>d.seven_day!=null).slice(-12);
   if (rec.length >= 2) {
     const hrs = (new Date(rec[rec.length-1].ts)-new Date(rec[0].ts))/3600000;
     const delta = rec[rec.length-1].seven_day-rec[0].seven_day;
     const rate = hrs > 0 ? delta/hrs : 0;
-    document.getElementById('burn').textContent = rate.toFixed(2)+'%/h';
-    document.getElementById('burn').className = 'sv '+cls(rate*168>100?80:rate*24>5?50:0);
+    const burnEl = document.getElementById('burn-'+id);
+    burnEl.textContent = rate.toFixed(2)+'%/h';
+    burnEl.className = 'sv '+cls(rate*168>100?80:rate*24>5?50:0);
+    const exhaustEl = document.getElementById('exhaust-'+id);
     if (rate > 0 && L.seven_day!=null) {
       const hLeft = (100-L.seven_day)/rate;
-      document.getElementById('exhaust').textContent = hLeft > 168 ? 'Never (within reset)' : new Date(Date.now()+hLeft*3600000).toLocaleDateString('en-GB',{weekday:'short',hour:'2-digit',minute:'2-digit'});
-      document.getElementById('exhaust').className = 'sv '+(hLeft<24?'red':hLeft<72?'yellow':'green');
-    } else { document.getElementById('exhaust').textContent = 'No burn'; document.getElementById('exhaust').className = 'sv green'; }
+      exhaustEl.textContent = hLeft > 168 ? 'Never (within reset)' : new Date(Date.now()+hLeft*3600000).toLocaleDateString('en-GB',{weekday:'short',hour:'2-digit',minute:'2-digit'});
+      exhaustEl.className = 'sv '+(hLeft<24?'red':hLeft<72?'yellow':'green');
+    } else { exhaustEl.textContent = 'No burn'; exhaustEl.className = 'sv green'; }
   }
   const validFh = data.filter(d=>d.five_hour!=null).map(d=>d.five_hour);
   const peakFh = validFh.length ? Math.max(...validFh) : 0;
-  document.getElementById('peak').textContent = peakFh+'%';
-  document.getElementById('peak').className = 'sv '+cls(peakFh);
-  document.getElementById('reset').textContent = ttl(L.seven_day_resets);
+  const peakEl = document.getElementById('peak-'+id);
+  peakEl.textContent = peakFh+'%';
+  peakEl.className = 'sv '+cls(peakFh);
+  document.getElementById('reset-'+id).textContent = ttl(L.seven_day_resets);
 
-  // Usage chart factory: line + linear pace reference
-  function makeUsageChart(canvasId, resetTs, windowH, field, color, bgColor) {
-    if (!resetTs) return;
-    const end = new Date(resetTs), start = new Date(end - windowH*3600000);
-    const filtered = data.filter(d => { const t = new Date(d.ts); return t >= start && t <= end; });
-    const xScales = windowH <= 5 ? xScale5h(start, end) : xScale7d(start, end);
-    new Chart(document.getElementById(canvasId), {
-      type:'line', data: {
-        labels: [start, ...filtered.map(d=>new Date(d.ts)), end],
-        datasets: [
-          {label:field,data:[null, ...filtered.map(d=>d[field]??0), null],borderColor:color,backgroundColor:bgColor,fill:true,tension:0.3,pointRadius:2},
-          {label:'Linear pace',data:[0, ...filtered.map(()=>null), 100],borderColor:'#ffffff55',borderDash:[6,4],borderWidth:1,pointRadius:0,fill:false,tension:0,spanGaps:true}
-        ]
-      }, options: {responsive:true,maintainAspectRatio:false,scales:{...xScales,y:{...pctScale}},plugins:{legend:{display:false}}}
-    });
+  // ── Usage charts ──
+  makeUsageChart(document.getElementById('session-'+id), data, L.five_hour_resets, 5, 'five_hour', p.session[0], p.session[1]);
+  makeUsageChart(document.getElementById('weekly-'+id), data, L.seven_day_resets, 168, 'seven_day', p.weekly[0], p.weekly[1]);
+  if (hasSonnet) {
+    makeUsageChart(document.getElementById('sonnet-'+id), data, L.seven_day_resets, 168, 'sonnet', p.sonnet[0], p.sonnet[1]);
   }
 
-  // Burn rate chart factory
-  function makeBurnChart(canvasId, resetTs, windowH, rateData, field, color, bgColor, doHourly, rawField) {
-    if (!resetTs) return;
-    const end = new Date(resetTs), start = new Date(end - windowH*3600000);
-    let filtered = rateData.filter(r => { const t = new Date(r.ts); return t >= start && t <= end; });
-    let labels, values;
-    if (doHourly) {
-      // One delta per hour: last value in this hour minus last value in previous hour
-      const inWindow = data.filter(d => { const t = new Date(d.ts); return t >= start && t <= end && d[rawField] != null; });
-      const hourBins = {};
-      inWindow.forEach(d => { const t = new Date(d.ts); t.setMinutes(0,0,0); const k = t.getTime(); hourBins[k] = d[rawField]; });
-      const hours = Object.keys(hourBins).map(Number).sort((a,b)=>a-b);
-      labels = []; values = [];
-      for (let h = 1; h < hours.length; h++) {
-        const delta = hourBins[hours[h]] - hourBins[hours[h-1]];
-        labels.push(new Date(hours[h]));
-        values.push(delta > 0 ? delta : 0);
-      }
-    } else {
-      labels = filtered.map(r=>new Date(r.ts)); values = filtered.map(r=>r[field]);
-    }
-    const xScales = windowH <= 5 ? xScale5h(start, end) : xScale7d(start, end);
-    const evenRate = doHourly ? 100 / windowH : 100 / (windowH * 6); // %/h or %/10min
-    const allLabels = [start, ...labels, end];
-    const allValues = [null, ...values, null];
-    new Chart(document.getElementById(canvasId), {
-      type:'line', data: { labels: allLabels,
-        datasets:[
-          {label:field,data:allValues,borderColor:color,backgroundColor:bgColor,fill:true,tension:0,pointRadius:3,pointBackgroundColor:color},
-          {label:'Even pace',data:allLabels.map(()=>evenRate),borderColor:'#ffffff55',borderDash:[6,4],borderWidth:1,pointRadius:0,fill:false}
-        ]
-      }, options: {responsive:true,maintainAspectRatio:false,scales:{...xScales,y:doHourly?burnYScale:burn10mYScale},plugins:{legend:{display:false}}}
-    });
-  }
-
-  // Usage charts
-  makeUsageChart('sessionChart', L.five_hour_resets, 5, 'five_hour', '#60a5fa', 'rgba(96,165,250,0.1)');
-  makeUsageChart('weeklyChart', L.seven_day_resets, 168, 'seven_day', '#f97316', 'rgba(249,115,22,0.1)');
-  makeUsageChart('sonnetChart', L.seven_day_resets, 168, 'sonnet', '#a78bfa', 'rgba(167,139,250,0.1)');
-
-  // Burn rates — skip gaps longer than 30min to avoid fake spikes after sleep/downtime
-  // Session burn rate: smoothed over 1h rolling window to eliminate rounding spikes
-  // Weekly/Sonnet burn rate: consecutive 5-min deltas (already hourly-bucketed in chart)
+  // ── Burn rates ──
   const rates = [];
   for (let i=1;i<data.length;i++) {
     const dt=(new Date(data[i].ts)-new Date(data[i-1].ts))/3600000;
-    if(dt<0.05 || dt>0.5)continue; // skip <3min (noisy) and >30min (gaps)
-    // Session: simple delta from previous point
-    const s0=data[i-1].five_hour, s1=data[i].five_hour;
-    const sDelta = (s0!=null && s1!=null && s1>=s0) ? s1-s0 : 0; // drop resets (value drops)
-    // Weekly/Sonnet: consecutive deltas
-    const w0=data[i-1].seven_day, w1=data[i].seven_day;
-    const n0=data[i-1].sonnet, n1=data[i].sonnet;
-    const wDelta = (w0!=null && w1!=null) ? w1-w0 : 0;
-    const snDelta = (n0!=null && n1!=null) ? n1-n0 : 0;
-    rates.push({ts:data[i].ts, session: sDelta, weekly: wDelta > 0 ? wDelta/dt : 0, sonnet: snDelta > 0 ? snDelta/dt : 0});
-  }
-
-  // Burn rate charts
-  makeBurnChart('burnSessionChart', L.five_hour_resets, 5, rates, 'session', '#60a5fa', 'rgba(96,165,250,0.1)', false);
-  makeBurnChart('burnWeeklyChart', L.seven_day_resets, 168, rates, 'weekly', '#f97316', 'rgba(249,115,22,0.1)', true, 'seven_day');
-  makeBurnChart('burnSonnetChart', L.seven_day_resets, 168, rates, 'sonnet', '#a78bfa', 'rgba(167,139,250,0.1)', true, 'sonnet');
-
-  document.getElementById('footer').textContent = 'Last update: '+new Date(L.ts).toLocaleString()+' · '+data.length+' points · File regenerated every 10 min';
-}
-
-// ── Codex Tab ──
-if (cxData.length) {
-  const CL = cxData[cxData.length-1];
-  [{id:'cx-s',v:CL.codex_five_hour,r:CL.codex_five_hour_resets},{id:'cx-w',v:CL.codex_seven_day,r:CL.codex_seven_day_resets}].forEach(x => {
-    const p = x.v ?? 0, left = 100-p;
-    const el = document.getElementById(x.id+'-val'); el.textContent = left.toFixed(0)+'%'; el.className = 'value '+cls(p);
-    document.getElementById(x.id+'-det').textContent = p+'% used · resets '+ttl(x.r);
-    const b = document.getElementById(x.id+'-bar'); b.style.width = p+'%'; b.style.background = col(p);
-  });
-  document.getElementById('cx-dp-val').textContent = cxData.length;
-  const cxSpanH = ((new Date(CL.ts)-new Date(cxData[0].ts))/3600000).toFixed(1);
-  document.getElementById('cx-dp-det').textContent = 'over '+cxSpanH+'h';
-
-  // Alert: warn when usage exceeds linear pace or >90%
-  const cxAlerts = [];
-  if (CL.codex_seven_day_resets) {
-    const resetMs = new Date(CL.codex_seven_day_resets).getTime();
-    const sampleMs = new Date(CL.ts).getTime();
-    const windowMs = 168 * 3600000;
-    const elapsed = windowMs - (resetMs - sampleMs);
-    const linearPace = Math.max(0, Math.min(100, elapsed / windowMs * 100));
-    if (CL.codex_seven_day > linearPace) cxAlerts.push('Weekly at '+CL.codex_seven_day+'% — above pace ('+linearPace.toFixed(0)+'%)');
-  }
-  if (CL.codex_seven_day >= 90) cxAlerts.push('Weekly usage at '+CL.codex_seven_day+'%');
-  if (CL.codex_five_hour >= 90) cxAlerts.push('Session usage at '+CL.codex_five_hour+'%');
-  if (cxAlerts.length) {
-    document.getElementById('cx-alert-text').textContent = cxAlerts.join(' · ');
-    document.getElementById('cx-alert').className = 'alert show';
-  }
-
-  // Stats
-  const cxRec = cxData.filter(d=>d.codex_seven_day!=null).slice(-12);
-  if (cxRec.length >= 2) {
-    const hrs = (new Date(cxRec[cxRec.length-1].ts)-new Date(cxRec[0].ts))/3600000;
-    const delta = cxRec[cxRec.length-1].codex_seven_day-cxRec[0].codex_seven_day;
-    const rate = hrs > 0 ? delta/hrs : 0;
-    document.getElementById('cx-burn').textContent = rate.toFixed(2)+'%/h';
-    document.getElementById('cx-burn').className = 'sv '+cls(rate*168>100?80:rate*24>5?50:0);
-    if (rate > 0 && CL.codex_seven_day!=null) {
-      const hLeft = (100-CL.codex_seven_day)/rate;
-      document.getElementById('cx-exhaust').textContent = hLeft > 168 ? 'Never (within reset)' : new Date(Date.now()+hLeft*3600000).toLocaleDateString('en-GB',{weekday:'short',hour:'2-digit',minute:'2-digit'});
-      document.getElementById('cx-exhaust').className = 'sv '+(hLeft<24?'red':hLeft<72?'yellow':'green');
-    } else { document.getElementById('cx-exhaust').textContent = 'No burn'; document.getElementById('cx-exhaust').className = 'sv green'; }
-  }
-  const cxValidFh = cxData.filter(d=>d.codex_five_hour!=null).map(d=>d.codex_five_hour);
-  const cxPeakFh = cxValidFh.length ? Math.max(...cxValidFh) : 0;
-  document.getElementById('cx-peak').textContent = cxPeakFh+'%';
-  document.getElementById('cx-peak').className = 'sv '+cls(cxPeakFh);
-  document.getElementById('cx-reset').textContent = ttl(CL.codex_seven_day_resets);
-
-  // Codex usage charts (reuse factories with codex fields)
-  function makeCxUsageChart(canvasId, resetTs, windowH, field, color, bgColor) {
-    if (!resetTs) return;
-    const end = new Date(resetTs), start = new Date(end - windowH*3600000);
-    const filtered = cxData.filter(d => { const t = new Date(d.ts); return t >= start && t <= end; });
-    const xScales = windowH <= 5 ? xScale5h(start, end) : xScale7d(start, end);
-    new Chart(document.getElementById(canvasId), {
-      type:'line', data: {
-        labels: [start, ...filtered.map(d=>new Date(d.ts)), end],
-        datasets: [
-          {label:field,data:[null, ...filtered.map(d=>d[field]??0), null],borderColor:color,backgroundColor:bgColor,fill:true,tension:0.3,pointRadius:2},
-          {label:'Linear pace',data:[0, ...filtered.map(()=>null), 100],borderColor:'#ffffff55',borderDash:[6,4],borderWidth:1,pointRadius:0,fill:false,tension:0,spanGaps:true}
-        ]
-      }, options: {responsive:true,maintainAspectRatio:false,scales:{...xScales,y:{...pctScale}},plugins:{legend:{display:false}}}
-    });
-  }
-
-  // Codex burn rates
-  const cxRates = [];
-  for (let i=1;i<cxData.length;i++) {
-    const dt=(new Date(cxData[i].ts)-new Date(cxData[i-1].ts))/3600000;
     if(dt<0.05 || dt>0.5)continue;
-    const s0=cxData[i-1].codex_five_hour, s1=cxData[i].codex_five_hour;
+    const s0=data[i-1].five_hour, s1=data[i].five_hour;
     const sDelta = (s0!=null && s1!=null && s1>=s0) ? s1-s0 : 0;
-    const w0=cxData[i-1].codex_seven_day, w1=cxData[i].codex_seven_day;
+    const w0=data[i-1].seven_day, w1=data[i].seven_day;
     const wDelta = (w0!=null && w1!=null) ? w1-w0 : 0;
-    cxRates.push({ts:cxData[i].ts, session: sDelta, weekly: wDelta > 0 ? wDelta/dt : 0});
-  }
-
-  function makeCxBurnChart(canvasId, resetTs, windowH, rateData, field, color, bgColor, doHourly, rawField) {
-    if (!resetTs) return;
-    const end = new Date(resetTs), start = new Date(end - windowH*3600000);
-    let labels, values;
-    if (doHourly) {
-      const inWindow = cxData.filter(d => { const t = new Date(d.ts); return t >= start && t <= end && d[rawField] != null; });
-      const hourBins = {};
-      inWindow.forEach(d => { const t = new Date(d.ts); t.setMinutes(0,0,0); const k = t.getTime(); hourBins[k] = d[rawField]; });
-      const hours = Object.keys(hourBins).map(Number).sort((a,b)=>a-b);
-      labels = []; values = [];
-      for (let h = 1; h < hours.length; h++) {
-        const delta = hourBins[hours[h]] - hourBins[hours[h-1]];
-        labels.push(new Date(hours[h]));
-        values.push(delta > 0 ? delta : 0);
-      }
-    } else {
-      const filtered = rateData.filter(r => { const t = new Date(r.ts); return t >= start && t <= end; });
-      labels = filtered.map(r=>new Date(r.ts)); values = filtered.map(r=>r[field]);
+    const r = {ts:data[i].ts, session: sDelta, weekly: wDelta > 0 ? wDelta/dt : 0};
+    if (hasSonnet) {
+      const n0=data[i-1].sonnet, n1=data[i].sonnet;
+      const snDelta = (n0!=null && n1!=null) ? n1-n0 : 0;
+      r.sonnet = snDelta > 0 ? snDelta/dt : 0;
     }
-    const xScales = windowH <= 5 ? xScale5h(start, end) : xScale7d(start, end);
-    const evenRate = doHourly ? 100 / windowH : 100 / (windowH * 6);
-    const allLabels = [start, ...labels, end];
-    const allValues = [null, ...values, null];
-    new Chart(document.getElementById(canvasId), {
-      type:'line', data: { labels: allLabels,
-        datasets:[
-          {label:field,data:allValues,borderColor:color,backgroundColor:bgColor,fill:true,tension:0,pointRadius:3,pointBackgroundColor:color},
-          {label:'Even pace',data:allLabels.map(()=>evenRate),borderColor:'#ffffff55',borderDash:[6,4],borderWidth:1,pointRadius:0,fill:false}
-        ]
-      }, options: {responsive:true,maintainAspectRatio:false,scales:{...xScales,y:doHourly?burnYScale:burn10mYScale},plugins:{legend:{display:false}}}
-    });
+    rates.push(r);
   }
 
-  makeCxUsageChart('cxSessionChart', CL.codex_five_hour_resets, 5, 'codex_five_hour', '#10b981', 'rgba(16,185,129,0.1)');
-  makeCxUsageChart('cxWeeklyChart', CL.codex_seven_day_resets, 168, 'codex_seven_day', '#f59e0b', 'rgba(245,158,11,0.1)');
-  makeCxBurnChart('cxBurnSessionChart', CL.codex_five_hour_resets, 5, cxRates, 'session', '#10b981', 'rgba(16,185,129,0.1)', false);
-  makeCxBurnChart('cxBurnWeeklyChart', CL.codex_seven_day_resets, 168, cxRates, 'weekly', '#f59e0b', 'rgba(245,158,11,0.1)', true, 'codex_seven_day');
-} else {
-  // No Codex data — show message
-  document.getElementById('tab-codex').innerHTML = '<div style="text-align:center;color:#666;padding:60px 20px;">No Codex data yet. Install <a href="https://github.com/openai/codex" style="color:#60a5fa;">OpenAI Codex CLI</a> and log in to start tracking.</div>';
+  makeBurnChart(document.getElementById('burnSession-'+id), data, L.five_hour_resets, 5, rates, 'session', p.session[0], p.session[1], false);
+  makeBurnChart(document.getElementById('burnWeekly-'+id), data, L.seven_day_resets, 168, rates, 'weekly', p.weekly[0], p.weekly[1], true, 'seven_day');
+  if (hasSonnet) {
+    makeBurnChart(document.getElementById('burnSonnet-'+id), data, L.seven_day_resets, 168, rates, 'sonnet', p.sonnet[0], p.sonnet[1], true, 'sonnet');
+  }
+});
+
+if (keys.length) {
+  const totalPts = Object.values(groups).reduce((s,g) => s+g.data.length, 0);
+  const allData = Object.values(groups).flatMap(g => g.data);
+  const lastTs = allData.reduce((max,d) => d.ts > max ? d.ts : max, '');
+  document.getElementById('footer').textContent = 'Last update: '+new Date(lastTs).toLocaleString()+' · '+totalPts+' points · File regenerated every 10 min';
 }
 </script>
 </body>
