@@ -20,8 +20,8 @@
   .subtitle { text-align: center; color: #666; font-size: 0.85em; margin-bottom: 24px; }
   .cards {
     display: grid;
-    grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
-    gap: 16px; margin-bottom: 24px; max-width: 1000px; margin-left: auto; margin-right: auto;
+    grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
+    gap: 16px; margin-bottom: 24px; max-width: 1000px; margin-left: auto; margin-right: auto; align-items: center;
   }
   .card {
     background: #1a1a24; border: 1px solid #2a2a3a; border-radius: 12px;
@@ -269,12 +269,12 @@ keys.forEach((key, idx) => {
     const limit = (L.extra_limit ?? 0) / 100;
     // Monthly reset: 1st of next month
     const now = new Date(L.ts);
-    const resetDate = new Date(now.getFullYear(), now.getMonth()+1, 1);
-    const resetStr = resetDate.toLocaleDateString('en-US', {month:'short', day:'numeric'});
+    const resetDate = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth()+1, 1));
+    const resetStr = resetDate.toLocaleDateString('en-US', {month:'short', day:'numeric', timeZone:'UTC'});
     cardsHtml += `
       <div class="card">
         <div class="label">Extra Usage</div>
-        <div class="value ${cls(ep)}">\$${used.toFixed(2)} / \$${limit.toFixed(2)}</div>
+        <div class="value ${cls(ep)}" style="font-size:1.6em">\$${used.toFixed(2)} / \$${limit.toFixed(0)}</div>
         <div class="detail">${ep.toFixed(1)}% spent · Resets ${resetStr}</div>
         <div class="bar-wrap"><div class="bar-fill" style="width:${ep}%;background:${col(ep)}"></div></div>
       </div>`;
@@ -306,6 +306,10 @@ keys.forEach((key, idx) => {
     cardsHtml += `
     <div class="chart-box"><div class="chart-title">💎 Sonnet (Weekly)</div><div class="chart-wrap"><canvas id="sonnet-${id}"></canvas></div></div>
     <div class="chart-box"><div class="chart-title">🔥 Sonnet Burn Rate (%/h)</div><div class="chart-wrap-sm"><canvas id="burnSonnet-${id}"></canvas></div></div>`;
+  }
+  if (hasExtra) {
+    cardsHtml += `
+    <div class="chart-box"><div class="chart-title">💰 Extra Usage (Monthly)</div><div class="chart-wrap"><canvas id="extra-${id}"></canvas></div></div>`;
   }
 
   tab.innerHTML = cardsHtml;
@@ -380,6 +384,35 @@ keys.forEach((key, idx) => {
   makeBurnChart(document.getElementById('burnWeekly-'+id), data, L.seven_day_resets, 168, rates, 'weekly', p.weekly[0], p.weekly[1], true, 'seven_day');
   if (hasSonnet) {
     makeBurnChart(document.getElementById('burnSonnet-'+id), data, L.seven_day_resets, 168, rates, 'sonnet', p.sonnet[0], p.sonnet[1], true, 'sonnet');
+  }
+
+  // ── Extra usage chart ──
+  if (hasExtra) {
+    const extraData = data.filter(d => d.extra_used != null);
+    if (extraData.length) {
+      const limit = (L.extra_limit ?? 0) / 100;
+      const labels = extraData.map(d => new Date(d.ts));
+      const values = extraData.map(d => (d.extra_used ?? 0) / 100);
+      const dollarScale = {grid:{color:'#1e1e2e'},ticks:{color:'#666',callback:v=>'$'+v.toFixed(0)},min:0,suggestedMax:limit};
+      // Calendar month x-axis: 1st to last day
+      const sampleDate = new Date(L.ts);
+      const monthStart = new Date(Date.UTC(sampleDate.getUTCFullYear(), sampleDate.getUTCMonth(), 1));
+      const monthEnd = new Date(Date.UTC(sampleDate.getUTCFullYear(), sampleDate.getUTCMonth()+1, 0, 23, 59, 59));
+      const xMonthly = {x:{...timeScale,min:monthStart,max:monthEnd,time:{...timeScale.time,unit:'day',displayFormats:{day:'MMM d'}},grid:{color:'#2a2a3a',lineWidth:1}}};
+      // Linear pace line: $0 on 1st → $limit on last day
+      const filteredExtra = extraData.filter(d => { const t = new Date(d.ts); return t >= monthStart && t <= monthEnd; });
+      const fLabels = filteredExtra.map(d => new Date(d.ts));
+      const fValues = filteredExtra.map(d => (d.extra_used ?? 0) / 100);
+      new Chart(document.getElementById('extra-'+id), {
+        type:'line', data: {
+          labels: [monthStart, ...fLabels, monthEnd],
+          datasets: [
+            {label:'Spent',data:[null, ...fValues, null],borderColor:'#10b981',backgroundColor:'rgba(16,185,129,0.1)',fill:true,tension:0.3,pointRadius:1},
+            {label:'Limit',data:[0, ...fLabels.map(()=>null), limit],borderColor:'#f8717155',borderDash:[6,4],borderWidth:1,pointRadius:0,fill:false,spanGaps:true}
+          ]
+        }, options: {responsive:true,maintainAspectRatio:false,scales:{...xMonthly,y:dollarScale},plugins:{legend:{display:false}}}
+      });
+    }
   }
 });
 

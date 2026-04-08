@@ -111,7 +111,7 @@ log_file = sys.argv[1]
 raw = os.environ.get('CLAUDE_RAW', '')
 claude_profile = os.environ.get('CLAUDE_PROFILE', '')
 codex_raw = os.environ.get('CODEX_RAW', '')
-cutoff = (datetime.now(timezone.utc) - timedelta(days=7)).isoformat()
+cutoff = (datetime.now(timezone.utc) - timedelta(days=35)).isoformat()
 now = datetime.now(timezone.utc).isoformat()
 
 # Parse Claude account email

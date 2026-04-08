@@ -38,7 +38,7 @@ import json, sys, os, tempfile
 from datetime import datetime, timezone, timedelta
 
 log_file, template_file, dashboard_file = sys.argv[1], sys.argv[2], sys.argv[3]
-cutoff = (datetime.now(timezone.utc) - timedelta(days=7)).isoformat()
+cutoff = (datetime.now(timezone.utc) - timedelta(days=35)).isoformat()
 
 lines = open(log_file).read().strip().split('\n')
 records = []
