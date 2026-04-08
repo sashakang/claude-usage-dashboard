@@ -81,6 +81,17 @@ if '__DATA_PLACEHOLDER__' not in template:
 
 html = template.replace('__DATA_PLACEHOLDER__', data_json)
 
+# Inject version from git tag
+import subprocess
+try:
+    version = subprocess.check_output(
+        ['git', 'describe', '--tags', '--abbrev=0'],
+        cwd=os.path.dirname(template_file), stderr=subprocess.DEVNULL
+    ).decode().strip()
+except Exception:
+    version = ''
+html = html.replace('__VERSION_PLACEHOLDER__', version)
+
 # Atomic write for dashboard
 fd, tmp = tempfile.mkstemp(dir=os.path.dirname(dashboard_file), suffix='.tmp')
 try:

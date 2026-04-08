@@ -281,11 +281,6 @@ keys.forEach((key, idx) => {
       </div>`;
   }
   cardsHtml += `
-      <div class="card">
-        <div class="label">Data Points</div>
-        <div class="value">${data.length}</div>
-        <div class="detail">over ${((new Date(L.ts)-new Date(data[0].ts))/3600000).toFixed(1)}h</div>
-      </div>
     </div>`;
 
   // Stats row
@@ -421,7 +416,7 @@ if (keys.length) {
   const totalPts = Object.values(groups).reduce((s,g) => s+g.data.length, 0);
   const allData = Object.values(groups).flatMap(g => g.data);
   const lastTs = allData.reduce((max,d) => d.ts > max ? d.ts : max, '');
-  document.getElementById('footer').textContent = 'Last update: '+new Date(lastTs).toLocaleString()+' · '+totalPts+' points · File regenerated every 10 min';
+  document.getElementById('footer').textContent = 'Last update: '+new Date(lastTs).toLocaleString()+' · '+totalPts+' points · File regenerated every 10 min · __VERSION_PLACEHOLDER__';
 }
 </script>
 </body>
