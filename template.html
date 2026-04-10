@@ -430,13 +430,14 @@ if (keys.length) {
   setInterval(updateAgo, 1000);
   document.getElementById('footer').textContent = totalPts+' points · __VERSION_PLACEHOLDER__';
 }
-// Auto-reload: check every 30s if page is stale (survives Safari background throttling)
+// Auto-reload every 10 min — multiple triggers to handle browser throttling
 const pageLoadTime = Date.now();
 const RELOAD_MS = 10 * 60 * 1000;
-setInterval(() => { if (Date.now() - pageLoadTime > RELOAD_MS) location.reload(); }, 30000);
-document.addEventListener('visibilitychange', () => {
-  if (!document.hidden && Date.now() - pageLoadTime > RELOAD_MS) location.reload();
-});
+function checkReload() { if (Date.now() - pageLoadTime > RELOAD_MS) location.reload(); }
+setInterval(checkReload, 30000);
+document.addEventListener('visibilitychange', () => { if (!document.hidden) checkReload(); });
+window.addEventListener('focus', checkReload);
+document.addEventListener('mousemove', checkReload, {once: true, capture: true});
 </script>
 </body>
 </html>
