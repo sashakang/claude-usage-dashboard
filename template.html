@@ -72,7 +72,7 @@
 <body>
 
 <h1>⚡ Usage Dashboard</h1>
-<div class="subtitle">Static file · Rebuilt every 10 min by launchd</div>
+<div class="subtitle" id="subtitle"></div>
 
 <div class="tabs" id="tabs"></div>
 <div id="content"></div>
@@ -415,7 +415,8 @@ if (keys.length) {
   const totalPts = Object.values(groups).reduce((s,g) => s+g.data.length, 0);
   const allData = Object.values(groups).flatMap(g => g.data);
   const lastTs = allData.reduce((max,d) => d.ts > max ? d.ts : max, '');
-  document.getElementById('footer').textContent = 'Last update: '+new Date(lastTs).toLocaleString()+' · '+totalPts+' points · File regenerated every 10 min · __VERSION_PLACEHOLDER__';
+  document.getElementById('subtitle').textContent = 'Last update: '+new Date(lastTs).toLocaleString();
+  document.getElementById('footer').textContent = totalPts+' points · __VERSION_PLACEHOLDER__';
 }
 </script>
 </body>
