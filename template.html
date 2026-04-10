@@ -419,8 +419,12 @@ if (keys.length) {
   const subtitleEl = document.getElementById('subtitle');
   function updateAgo() {
     const diff = Math.floor((Date.now() - lastDate.getTime()) / 1000);
-    const m = Math.floor(diff / 60), s = diff % 60;
-    subtitleEl.textContent = 'Updated ' + (m > 0 ? m + 'm ' : '') + s + 's ago';
+    const d = Math.floor(diff / 86400), h = Math.floor((diff % 86400) / 3600), m = Math.floor((diff % 3600) / 60), s = diff % 60;
+    let ago = '';
+    if (d > 0) ago = d + 'd ' + h + 'h';
+    else if (h > 0) ago = h + 'h ' + m + 'm';
+    else ago = (m > 0 ? m + 'm ' : '') + s + 's';
+    subtitleEl.textContent = 'Updated ' + ago + ' ago';
   }
   updateAgo();
   setInterval(updateAgo, 1000);
