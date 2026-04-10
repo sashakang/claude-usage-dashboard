@@ -415,9 +415,18 @@ if (keys.length) {
   const totalPts = Object.values(groups).reduce((s,g) => s+g.data.length, 0);
   const allData = Object.values(groups).flatMap(g => g.data);
   const lastTs = allData.reduce((max,d) => d.ts > max ? d.ts : max, '');
-  document.getElementById('subtitle').textContent = 'Last update: '+new Date(lastTs).toLocaleString();
+  const lastDate = new Date(lastTs);
+  const subtitleEl = document.getElementById('subtitle');
+  function updateAgo() {
+    const diff = Math.floor((Date.now() - lastDate.getTime()) / 1000);
+    const m = Math.floor(diff / 60), s = diff % 60;
+    subtitleEl.textContent = 'Updated ' + (m > 0 ? m + 'm ' : '') + s + 's ago';
+  }
+  updateAgo();
+  setInterval(updateAgo, 1000);
   document.getElementById('footer').textContent = totalPts+' points · __VERSION_PLACEHOLDER__';
 }
+setTimeout(() => location.reload(), 10 * 60 * 1000);
 </script>
 </body>
 </html>
