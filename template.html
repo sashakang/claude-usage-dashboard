@@ -68,7 +68,6 @@
   .tab-content { display: none; }
   .tab-content.active { display: block; }
 </style>
-<meta http-equiv="refresh" content="600">
 </head>
 <body>
 
@@ -431,11 +430,13 @@ if (keys.length) {
   setInterval(updateAgo, 1000);
   document.getElementById('footer').textContent = totalPts+' points · __VERSION_PLACEHOLDER__';
 }
-// Auto-reload: meta refresh handles background tabs; visibilitychange catches tab-switch
-document.addEventListener('visibilitychange', () => {
-  if (!document.hidden && Date.now() - pageLoadTime > 10 * 60 * 1000) location.reload();
-});
+// Auto-reload: check every 30s if page is stale (survives Safari background throttling)
 const pageLoadTime = Date.now();
+const RELOAD_MS = 10 * 60 * 1000;
+setInterval(() => { if (Date.now() - pageLoadTime > RELOAD_MS) location.reload(); }, 30000);
+document.addEventListener('visibilitychange', () => {
+  if (!document.hidden && Date.now() - pageLoadTime > RELOAD_MS) location.reload();
+});
 </script>
 </body>
 </html>
