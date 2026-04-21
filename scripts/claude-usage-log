@@ -28,82 +28,82 @@ except:
   fi
 fi
 
-# Helper: write error record as proper JSON
-log_error() {
-  python3 -c "
-import json, sys
-from datetime import datetime, timezone
-print(json.dumps({'error': sys.argv[1], 'ts': datetime.now(timezone.utc).isoformat()}))
-" "$1" >> "$LOG_FILE"
-}
-
 # Wait for network after sleep/wake (up to 30s)
 for i in $(seq 1 6); do
   curl -s --max-time 3 -o /dev/null "https://api.anthropic.com" 2>/dev/null && break
   sleep 5
 done
 
-# Get token from Keychain
+# Fetch Claude usage independently from Codex. A Claude failure must not
+# prevent Codex from being recorded.
+CLAUDE_RAW=""
+CLAUDE_PROFILE=""
+CLAUDE_ERROR=""
 TOKEN=$(security find-generic-password -s "Claude Code-credentials" -w 2>/dev/null \
-  | python3 -c "import sys,json; print(json.loads(sys.stdin.read())['claudeAiOauth']['accessToken'])" 2>/dev/null) || {
-  log_error "keychain_read_failed"
-  exit 1
-}
-
-# Fetch usage (retry up to 3 times for network errors or null responses)
-RAW=""
-GOOD=false
-for attempt in 1 2 3; do
-  if RAW=$(curl -s --max-time 10 "https://api.anthropic.com/api/oauth/usage" \
-    -H "Authorization: Bearer $TOKEN" \
-    -H "anthropic-beta: oauth-2025-04-20" 2>/dev/null); then
-    # Check if response has real data (five_hour field is non-null)
-    if echo "$RAW" | python3 -c "import sys,json; d=json.load(sys.stdin); exit(0 if d.get('five_hour',{}).get('utilization') is not None else 1)" 2>/dev/null; then
-      GOOD=true
-      break
+  | python3 -c "import sys,json; print(json.loads(sys.stdin.read())['claudeAiOauth']['accessToken'])" 2>/dev/null) || TOKEN=""
+if [ -n "$TOKEN" ]; then
+  CLAUDE_GOOD=false
+  for attempt in 1 2 3; do
+    if CLAUDE_RAW=$(curl -s --max-time 10 "https://api.anthropic.com/api/oauth/usage" \
+      -H "Authorization: Bearer $TOKEN" \
+      -H "anthropic-beta: oauth-2025-04-20" 2>/dev/null); then
+      # Check if response has real data (five_hour field is non-null)
+      if echo "$CLAUDE_RAW" | python3 -c "import sys,json; d=json.load(sys.stdin); exit(0 if d.get('five_hour',{}).get('utilization') is not None else 1)" 2>/dev/null; then
+        CLAUDE_GOOD=true
+        break
+      fi
     fi
+    if [ "$attempt" -lt 3 ]; then
+      sleep 5
+    fi
+  done
+  if [ "$CLAUDE_GOOD" = "true" ]; then
+    CLAUDE_PROFILE=$(curl -s --max-time 5 "https://api.anthropic.com/api/oauth/profile" \
+      -H "Authorization: Bearer $TOKEN" \
+      -H "anthropic-beta: oauth-2025-04-20" 2>/dev/null) || CLAUDE_PROFILE=""
+  else
+    CLAUDE_ERROR="claude_api_failed_after_retries"
   fi
-  if [ "$attempt" -lt 3 ]; then
-    sleep 5
-  fi
-done
-
-if [ "$GOOD" != "true" ]; then
-  log_error "api_failed_after_retries"
-  exit 1
+else
+  CLAUDE_ERROR="claude_keychain_read_failed"
 fi
 
-# Fetch Claude profile for account identity
-CLAUDE_PROFILE=$(curl -s --max-time 5 "https://api.anthropic.com/api/oauth/profile" \
-  -H "Authorization: Bearer $TOKEN" \
-  -H "anthropic-beta: oauth-2025-04-20" 2>/dev/null) || CLAUDE_PROFILE=""
-
-# Fetch OpenAI Codex usage (best-effort — failure doesn't block Claude logging)
+# Fetch OpenAI Codex usage independently from Claude.
 CODEX_RAW=""
+CODEX_ERROR=""
 CODEX_AUTH="$HOME/.codex/auth.json"
 if [ -f "$CODEX_AUTH" ]; then
   CODEX_TOKEN=$(python3 -c "import sys,json; print(json.load(open(sys.argv[1]))['tokens']['access_token'])" "$CODEX_AUTH" 2>/dev/null) || CODEX_TOKEN=""
   if [ -n "$CODEX_TOKEN" ]; then
+    CODEX_GOOD=false
     for attempt in 1 2 3; do
       if CODEX_RAW=$(curl -s --max-time 10 "https://chatgpt.com/backend-api/wham/usage" \
         -H "Authorization: Bearer $CODEX_TOKEN" 2>/dev/null); then
         if echo "$CODEX_RAW" | python3 -c "import sys,json; d=json.load(sys.stdin); exit(0 if d.get('rate_limit',{}).get('primary_window') else 1)" 2>/dev/null; then
+          CODEX_GOOD=true
           break
         fi
       fi
       CODEX_RAW=""
       if [ "$attempt" -lt 3 ]; then sleep 3; fi
     done
+    if [ "$CODEX_GOOD" != "true" ]; then
+      CODEX_ERROR="codex_api_failed_after_retries"
+    fi
+  else
+    CODEX_ERROR="codex_auth_read_failed"
   fi
 fi
 
 # Rotate old records (>7d) before appending — safe because this is the sole writer
 # Then append new records. Both operations in one Python call to avoid gaps.
 # Pass API responses via env vars (not stdin — heredoc uses stdin for the script source)
-export CLAUDE_RAW="$RAW"
+export CLAUDE_RAW
 export CLAUDE_PROFILE
 export CODEX_RAW
-python3 - "$LOG_FILE" <<'PYEOF'
+export CLAUDE_ERROR
+export CODEX_ERROR
+SUCCESS_COUNT=$(python3 - "$LOG_FILE" <<'PYEOF'
 import json, sys, os, tempfile
 from datetime import datetime, timezone, timedelta
 
@@ -111,6 +111,8 @@ log_file = sys.argv[1]
 raw = os.environ.get('CLAUDE_RAW', '')
 claude_profile = os.environ.get('CLAUDE_PROFILE', '')
 codex_raw = os.environ.get('CODEX_RAW', '')
+claude_error = os.environ.get('CLAUDE_ERROR', '')
+codex_error = os.environ.get('CODEX_ERROR', '')
 cutoff = (datetime.now(timezone.utc) - timedelta(days=35)).isoformat()
 now = datetime.now(timezone.utc).isoformat()
 
@@ -129,25 +131,30 @@ except:
     d = {'error': 'parse_failed', 'raw': raw[:200]}
 
 records = []
+errors = []
+success_count = 0
 
-# Claude record
-records.append({
-    'ts': now,
-    'service': 'claude',
-    'account': claude_account,
-    'five_hour': d.get('five_hour', {}).get('utilization'),
-    'five_hour_resets': d.get('five_hour', {}).get('resets_at'),
-    'seven_day': d.get('seven_day', {}).get('utilization'),
-    'seven_day_resets': d.get('seven_day', {}).get('resets_at'),
-    'sonnet': d.get('seven_day_sonnet', {}).get('utilization') if d.get('seven_day_sonnet') else None,
-    'extra_enabled': d.get('extra_usage', {}).get('is_enabled', False),
-    'extra_used': d.get('extra_usage', {}).get('used_credits'),
-    'extra_limit': d.get('extra_usage', {}).get('monthly_limit'),
-    'extra_pct': d.get('extra_usage', {}).get('utilization'),
-})
+if raw and not claude_error:
+    records.append({
+        'ts': now,
+        'service': 'claude',
+        'account': claude_account,
+        'five_hour': d.get('five_hour', {}).get('utilization'),
+        'five_hour_resets': d.get('five_hour', {}).get('resets_at'),
+        'seven_day': d.get('seven_day', {}).get('utilization'),
+        'seven_day_resets': d.get('seven_day', {}).get('resets_at'),
+        'sonnet': d.get('seven_day_sonnet', {}).get('utilization') if d.get('seven_day_sonnet') else None,
+        'extra_enabled': d.get('extra_usage', {}).get('is_enabled', False),
+        'extra_used': d.get('extra_usage', {}).get('used_credits'),
+        'extra_limit': d.get('extra_usage', {}).get('monthly_limit'),
+        'extra_pct': d.get('extra_usage', {}).get('utilization'),
+    })
+    success_count += 1
+elif claude_error:
+    errors.append({'error': claude_error, 'ts': now})
 
 # Codex record (if available)
-if codex_raw:
+if codex_raw and not codex_error:
     try:
         cx = json.loads(codex_raw)
         rl = cx.get('rate_limit', {})
@@ -162,8 +169,11 @@ if codex_raw:
             'seven_day': sw.get('used_percent'),
             'seven_day_resets': datetime.fromtimestamp(sw['reset_at'], tz=timezone.utc).isoformat() if sw.get('reset_at') else None,
         })
+        success_count += 1
     except:
-        pass
+        errors.append({'error': 'codex_parse_failed', 'ts': now})
+elif codex_error:
+    errors.append({'error': codex_error, 'ts': now})
 
 # Read existing, split into keep vs archive
 keep = []
@@ -193,6 +203,8 @@ if archive:
 # Write kept records + new records atomically
 for rec in records:
     keep.append(json.dumps(rec))
+for err in errors:
+    keep.append(json.dumps(err))
 fd, tmp = tempfile.mkstemp(dir=os.path.dirname(log_file), suffix='.tmp')
 try:
     with os.fdopen(fd, 'w') as f:
@@ -201,7 +213,11 @@ try:
 except:
     os.unlink(tmp)
     raise
+print(success_count)
 PYEOF
+)
 
-# Rebuild static dashboard
-claude-usage-build "$LOG_FILE" 2>&1 || echo "warning: dashboard build failed" >&2
+# Rebuild static dashboard only when at least one service usage row succeeded.
+if [ "$SUCCESS_COUNT" -gt 0 ]; then
+  claude-usage-build "$LOG_FILE" 2>&1 || echo "warning: dashboard build failed" >&2
+fi
