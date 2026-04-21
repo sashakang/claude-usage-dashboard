@@ -28,7 +28,7 @@ Claude's API has rate limits — a 5-hour session window and a 7-day weekly wind
 ## Requirements
 
 - **macOS** (uses launchd for scheduling and Keychain for auth)
-- **Claude Code** installed and logged in (the OAuth token is read from your Keychain)
+- **Claude Code** installed and logged in with a claude.ai subscription session (the dashboard reads that OAuth token from your Keychain)
 - **Python 3**
 
 ## Install
@@ -79,10 +79,12 @@ claude-usage-build
 A launchd job runs `claude-usage-log` every 10 minutes:
 1. Reads your OAuth token from the macOS Keychain
 2. Fetches usage from `https://api.anthropic.com/api/oauth/usage`
-3. Appends a timestamped record to a JSONL file (with 7-day rotation)
+3. Appends a timestamped usage or service-specific error record to a JSONL file
 4. Calls `claude-usage-build` which bakes the data into `template.html` and writes `index.html`
 
 The dashboard is a single static HTML file — no backend needed, just open it in a browser.
+
+If Claude drops out of its local subscription login state, Codex can keep updating while Claude goes stale. The dashboard now shows Claude-specific collector/auth failures instead of silently looking frozen. Recovery is manual: run `claude auth login` to restore the local Claude session.
 
 ## Project Structure
 
@@ -97,7 +99,7 @@ The dashboard is a single static HTML file — no backend needed, just open it i
 
 ## Data Format
 
-Each JSONL record:
+Each successful JSONL record:
 ```json
 {
   "ts": "2026-04-04T16:47:27Z",
@@ -107,5 +109,14 @@ Each JSONL record:
   "seven_day_resets": "2026-04-09T05:00:00Z",
   "sonnet": 0.0,
   "extra_enabled": true
+}
+```
+
+Error rows are also stored in the same file:
+```json
+{
+  "ts": "2026-04-21T19:27:09.575006+00:00",
+  "service": "claude",
+  "error": "claude_session_missing"
 }
 ```

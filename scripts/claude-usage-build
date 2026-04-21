@@ -46,7 +46,14 @@ skipped = 0
 for l in lines:
     try:
         r = json.loads(l)
+        if not r.get('ts'):
+            continue
+        if r.get('ts', '') < cutoff:
+            continue
         if 'error' in r:
+            if 'service' not in r:
+                r['service'] = 'claude'
+            records.append(r)
             continue
         if r.get('seven_day') is None and r.get('five_hour') is None and r.get('codex_seven_day') is None and r.get('codex_five_hour') is None:
             continue
@@ -61,8 +68,7 @@ for l in lines:
                       'seven_day': r.pop('codex_seven_day', None),
                       'seven_day_resets': r.pop('codex_seven_day_resets', None)}
                 records.append(cx)
-        if r.get('ts', '') >= cutoff:
-            records.append(r)
+        records.append(r)
     except:
         skipped += 1
 

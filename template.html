@@ -65,6 +65,8 @@
   }
   .tab-btn:hover { border-color: #444; color: #ccc; }
   .tab-btn.active { background: #2a2a3a; color: #fff; border-color: #555; }
+  .tab-btn.unhealthy { border-color: #7f1d1d; color: #fca5a5; }
+  .tab-btn.active.unhealthy { background: #2d1b1b; border-color: #7f1d1d; }
   .tab-content { display: none; }
   .tab-content.active { display: block; }
 </style>
@@ -79,7 +81,7 @@
 <div class="footer" id="footer"></div>
 
 <script>
-const rawData = __DATA_PLACEHOLDER__;
+const rawEntries = __DATA_PLACEHOLDER__;
 
 // ── Helpers ──
 function col(p) { return p < 50 ? '#4ade80' : p < 80 ? '#fbbf24' : '#f87171'; }
@@ -90,6 +92,41 @@ function ttl(iso) {
   const h = d/3600000; return h > 24 ? (h/24).toFixed(1)+'d' : Math.floor(h)+'h '+Math.floor((d%3600000)/60000)+'m';
 }
 function esc(s) { return s.replace(/[^a-zA-Z0-9]/g, '_'); }
+function tsMs(iso) { return iso ? new Date(iso).getTime() : 0; }
+function latestEntry(entries) {
+  if (!entries.length) return null;
+  return entries.reduce((latest, entry) => tsMs(entry.ts) > tsMs(latest.ts) ? entry : latest);
+}
+function agoShort(iso) {
+  if (!iso) return 'never';
+  const diff = Math.max(0, Math.floor((Date.now() - tsMs(iso)) / 1000));
+  const d = Math.floor(diff / 86400), h = Math.floor((diff % 86400) / 3600), m = Math.floor((diff % 3600) / 60), s = diff % 60;
+  if (d > 0) return d + 'd ' + h + 'h';
+  if (h > 0) return h + 'h ' + m + 'm';
+  return (m > 0 ? m + 'm ' : '') + s + 's';
+}
+function humanizeError(code) {
+  const map = {
+    claude_session_missing: 'Claude login is missing on this machine',
+    claude_session_expired: 'Claude session token has expired',
+    claude_usage_http_401: 'Claude usage request was rejected with 401',
+    claude_usage_http_403: 'Claude usage request was rejected with 403',
+    claude_usage_null_after_retries: 'Claude usage endpoint returned no usable data after retries',
+    codex_auth_read_failed: 'Codex auth token could not be read',
+    codex_api_failed_after_retries: 'Codex usage endpoint returned no usable data after retries',
+    codex_parse_failed: 'Codex usage response could not be parsed',
+  };
+  return map[code] || code.replaceAll('_', ' ');
+}
+function isAuthRelatedError(service, code) {
+  if (service !== 'claude') return false;
+  return [
+    'claude_session_missing',
+    'claude_session_expired',
+    'claude_usage_http_401',
+    'claude_usage_http_403'
+  ].includes(code);
+}
 const isFile = location.protocol === 'file:';
 function refreshPage() {
   if (isFile) {
@@ -166,12 +203,17 @@ function makeBurnChart(canvas, data, resetTs, windowH, rateData, field, color, b
   });
 }
 
+const successEntries = [];
+const errorEntries = [];
+rawEntries.forEach(entry => {
+  if (entry && entry.error) errorEntries.push(entry);
+  else if (entry && (entry.seven_day != null || entry.five_hour != null || entry.codex_seven_day != null || entry.codex_five_hour != null)) successEntries.push(entry);
+});
+
 // ── Group data by service:account ──
-// First pass: collect all records, tracking known accounts per service
 const groups = {};
 const svcAccounts = {}; // service → Set of non-default accounts
-rawData.forEach(d => {
-  if (d.seven_day == null && d.five_hour == null) return;
+successEntries.forEach(d => {
   const svc = d.service || 'claude';
   const acct = d.account || 'default';
   if (acct !== 'default') {
@@ -197,10 +239,41 @@ Object.keys(groups).forEach(key => {
   }
 });
 
-const keys = Object.keys(groups).sort((a,b) => {
+const serviceStates = {};
+const services = new Set([
+  ...Object.values(groups).map(g => g.service),
+  ...errorEntries.map(e => e.service || 'claude')
+]);
+
+services.forEach(service => {
+  const serviceSuccesses = successEntries.filter(entry => (entry.service || 'claude') === service);
+  const serviceErrors = errorEntries.filter(entry => (entry.service || 'claude') === service);
+  const timeline = serviceSuccesses.concat(serviceErrors).sort((a, b) => tsMs(a.ts) - tsMs(b.ts));
+  let consecutiveFailures = 0;
+  for (let i = timeline.length - 1; i >= 0; i--) {
+    if (timeline[i].error) consecutiveFailures += 1;
+    else break;
+  }
+  const latestSuccess = latestEntry(serviceSuccesses);
+  const latestError = latestEntry(serviceErrors);
+  const authBroken = latestError && isAuthRelatedError(service, latestError.error) &&
+    (!latestSuccess || tsMs(latestError.ts) >= tsMs(latestSuccess.ts));
+  serviceStates[service] = {
+    latestSuccess,
+    latestError,
+    consecutiveFailures,
+    unhealthy: consecutiveFailures >= 2 || authBroken,
+  };
+  if (!Object.values(groups).some(g => g.service === service)) {
+    groups[service + ':default'] = {service, account: 'default', data: []};
+  }
+});
+
+const keys = Object.keys(groups).sort((a, b) => {
   const ga = groups[a], gb = groups[b];
   if (ga.service !== gb.service) return ga.service.localeCompare(gb.service); // claude before codex
-  const la = ga.data[ga.data.length-1].ts, lb = gb.data[gb.data.length-1].ts;
+  const la = ga.data.length ? ga.data[ga.data.length - 1].ts : (serviceStates[ga.service]?.latestError?.ts || '');
+  const lb = gb.data.length ? gb.data[gb.data.length - 1].ts : (serviceStates[gb.service]?.latestError?.ts || '');
   return lb.localeCompare(la); // most recent first within same service
 });
 if (!keys.length) { document.getElementById('footer').textContent = 'No data yet'; }
@@ -215,7 +288,8 @@ function getPalette(svc) { return palette[svc] || palette.claude; }
 // ── Tab label: "Service (user)" — deduplicate if only one account per service ──
 function tabLabel(g) {
   const name = g.service.charAt(0).toUpperCase() + g.service.slice(1);
-  return g.account === 'default' ? name : name + ' (' + g.account + ')';
+  const label = g.account === 'default' ? name : name + ' (' + g.account + ')';
+  return serviceStates[g.service]?.unhealthy ? label + ' [stale]' : label;
 }
 
 // ── Build tabs and content ──
@@ -230,14 +304,15 @@ function switchTab(key) {
 keys.forEach((key, idx) => {
   const g = groups[key];
   const data = g.data;
-  const L = data[data.length-1];
+  const health = serviceStates[g.service] || {};
+  const L = data[data.length-1] || health.latestSuccess;
   const p = getPalette(g.service);
   const id = esc(key);
   const hasSonnet = g.service === 'claude' && data.some(d => d.sonnet != null);
 
   // Tab button
   const btn = document.createElement('button');
-  btn.className = 'tab-btn' + (idx === 0 ? ' active' : '');
+  btn.className = 'tab-btn' + (idx === 0 ? ' active' : '') + (health.unhealthy ? ' unhealthy' : '');
   btn.textContent = tabLabel(g);
   btn.dataset.key = key;
   btn.onclick = () => switchTab(key);
@@ -249,72 +324,76 @@ keys.forEach((key, idx) => {
   tab.className = 'tab-content' + (idx === 0 ? ' active' : '');
 
   // Build cards HTML
-  let cardsHtml = `
-    <div class="alert" id="alert-${id}">⚠️ <span id="alert-text-${id}"></span></div>
-    <div class="cards">
-      <div class="card">
-        <div class="label">Session (5h)</div>
-        <div class="value ${cls(L.five_hour??0)}">${(100-(L.five_hour??0)).toFixed(0)}%</div>
-        <div class="detail">${L.five_hour??0}% used · resets ${ttl(L.five_hour_resets)}</div>
-        <div class="bar-wrap"><div class="bar-fill" style="width:${L.five_hour??0}%;background:${col(L.five_hour??0)}"></div></div>
-      </div>
-      <div class="card">
-        <div class="label">Weekly (7d)</div>
-        <div class="value ${cls(L.seven_day??0)}">${(100-(L.seven_day??0)).toFixed(0)}%</div>
-        <div class="detail">${L.seven_day??0}% used · resets ${ttl(L.seven_day_resets)}</div>
-        <div class="bar-wrap"><div class="bar-fill" style="width:${L.seven_day??0}%;background:${col(L.seven_day??0)}"></div></div>
+  let cardsHtml = `<div class="alert" id="alert-${id}">⚠️ <span id="alert-text-${id}"></span></div>`;
+  let hasExtra = false;
+  if (L) {
+    cardsHtml += `
+      <div class="cards">
+        <div class="card">
+          <div class="label">Session (5h)</div>
+          <div class="value ${cls(L.five_hour??0)}">${(100-(L.five_hour??0)).toFixed(0)}%</div>
+          <div class="detail">${L.five_hour??0}% used · resets ${ttl(L.five_hour_resets)}</div>
+          <div class="bar-wrap"><div class="bar-fill" style="width:${L.five_hour??0}%;background:${col(L.five_hour??0)}"></div></div>
+        </div>
+        <div class="card">
+          <div class="label">Weekly (7d)</div>
+          <div class="value ${cls(L.seven_day??0)}">${(100-(L.seven_day??0)).toFixed(0)}%</div>
+          <div class="detail">${L.seven_day??0}% used · resets ${ttl(L.seven_day_resets)}</div>
+          <div class="bar-wrap"><div class="bar-fill" style="width:${L.seven_day??0}%;background:${col(L.seven_day??0)}"></div></div>
+        </div>`;
+    if (hasSonnet) {
+      cardsHtml += `
+        <div class="card">
+          <div class="label">Sonnet (Weekly)</div>
+          <div class="value ${cls(L.sonnet??0)}">${(100-(L.sonnet??0)).toFixed(0)}%</div>
+          <div class="detail">${L.sonnet??0}% used · resets ${ttl(L.seven_day_resets)}</div>
+          <div class="bar-wrap"><div class="bar-fill" style="width:${L.sonnet??0}%;background:${col(L.sonnet??0)}"></div></div>
+        </div>`;
+    }
+    hasExtra = L.extra_enabled && L.extra_limit != null;
+    if (hasExtra) {
+      const ep = L.extra_pct ?? 0;
+      const used = (L.extra_used ?? 0) / 100;
+      const limit = (L.extra_limit ?? 0) / 100;
+      const now = new Date(L.ts);
+      const resetDate = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth()+1, 1));
+      const resetStr = resetDate.toLocaleDateString('en-US', {month:'short', day:'numeric', timeZone:'UTC'});
+      cardsHtml += `
+        <div class="card">
+          <div class="label">Extra Usage</div>
+          <div class="value ${cls(ep)}" style="font-size:1.6em">\$${used.toFixed(2)} / \$${limit.toFixed(0)}</div>
+          <div class="detail">${ep.toFixed(1)}% spent · Resets ${resetStr}</div>
+          <div class="bar-wrap"><div class="bar-fill" style="width:${ep}%;background:${col(ep)}"></div></div>
+        </div>`;
+    }
+    cardsHtml += `</div>`;
+    cardsHtml += `
+      <div class="stats-row">
+        <div class="stat-box"><div class="sl">Burn Rate (weekly/hr)</div><div class="sv" id="burn-${id}">--</div></div>
+        <div class="stat-box"><div class="sl">Est. Weekly Exhaustion</div><div class="sv" id="exhaust-${id}">--</div></div>
+        <div class="stat-box"><div class="sl">Peak Session Usage</div><div class="sv" id="peak-${id}">--</div></div>
+        <div class="stat-box"><div class="sl">Weekly Reset</div><div class="sv" id="reset-${id}">--</div></div>
       </div>`;
-  if (hasSonnet) {
     cardsHtml += `
-      <div class="card">
-        <div class="label">Sonnet (Weekly)</div>
-        <div class="value ${cls(L.sonnet??0)}">${(100-(L.sonnet??0)).toFixed(0)}%</div>
-        <div class="detail">${L.sonnet??0}% used · resets ${ttl(L.seven_day_resets)}</div>
-        <div class="bar-wrap"><div class="bar-fill" style="width:${L.sonnet??0}%;background:${col(L.sonnet??0)}"></div></div>
+      <div class="chart-box"><div class="chart-title">⏱ Session (5h Window)</div><div class="chart-wrap"><canvas id="session-${id}"></canvas></div></div>
+      <div class="chart-box"><div class="chart-title">🔥 Session Burn Rate (%/10m)</div><div class="chart-wrap-sm"><canvas id="burnSession-${id}"></canvas></div></div>
+      <div class="chart-box"><div class="chart-title">📅 Weekly (7d Window)</div><div class="chart-wrap"><canvas id="weekly-${id}"></canvas></div></div>
+      <div class="chart-box"><div class="chart-title">🔥 Weekly Burn Rate (%/h)</div><div class="chart-wrap-sm"><canvas id="burnWeekly-${id}"></canvas></div></div>`;
+    if (hasSonnet) {
+      cardsHtml += `
+      <div class="chart-box"><div class="chart-title">💎 Sonnet (Weekly)</div><div class="chart-wrap"><canvas id="sonnet-${id}"></canvas></div></div>
+      <div class="chart-box"><div class="chart-title">🔥 Sonnet Burn Rate (%/h)</div><div class="chart-wrap-sm"><canvas id="burnSonnet-${id}"></canvas></div></div>`;
+    }
+    if (hasExtra) {
+      cardsHtml += `
+      <div class="chart-box"><div class="chart-title">💰 Extra Usage (Monthly)</div><div class="chart-wrap"><canvas id="extra-${id}"></canvas></div></div>`;
+    }
+  } else {
+    cardsHtml += `
+      <div class="chart-box">
+        <div class="chart-title">No recent successful samples</div>
+        <div class="detail">This service has recent collector failures but no successful samples in the current history window.</div>
       </div>`;
-  }
-  const hasExtra = L.extra_enabled && L.extra_limit != null;
-  if (hasExtra) {
-    const ep = L.extra_pct ?? 0;
-    const used = (L.extra_used ?? 0) / 100;
-    const limit = (L.extra_limit ?? 0) / 100;
-    // Monthly reset: 1st of next month
-    const now = new Date(L.ts);
-    const resetDate = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth()+1, 1));
-    const resetStr = resetDate.toLocaleDateString('en-US', {month:'short', day:'numeric', timeZone:'UTC'});
-    cardsHtml += `
-      <div class="card">
-        <div class="label">Extra Usage</div>
-        <div class="value ${cls(ep)}" style="font-size:1.6em">\$${used.toFixed(2)} / \$${limit.toFixed(0)}</div>
-        <div class="detail">${ep.toFixed(1)}% spent · Resets ${resetStr}</div>
-        <div class="bar-wrap"><div class="bar-fill" style="width:${ep}%;background:${col(ep)}"></div></div>
-      </div>`;
-  }
-  cardsHtml += `</div>`;
-
-  // Stats row
-  cardsHtml += `
-    <div class="stats-row">
-      <div class="stat-box"><div class="sl">Burn Rate (weekly/hr)</div><div class="sv" id="burn-${id}">--</div></div>
-      <div class="stat-box"><div class="sl">Est. Weekly Exhaustion</div><div class="sv" id="exhaust-${id}">--</div></div>
-      <div class="stat-box"><div class="sl">Peak Session Usage</div><div class="sv" id="peak-${id}">--</div></div>
-      <div class="stat-box"><div class="sl">Weekly Reset</div><div class="sv" id="reset-${id}">--</div></div>
-    </div>`;
-
-  // Charts
-  cardsHtml += `
-    <div class="chart-box"><div class="chart-title">⏱ Session (5h Window)</div><div class="chart-wrap"><canvas id="session-${id}"></canvas></div></div>
-    <div class="chart-box"><div class="chart-title">🔥 Session Burn Rate (%/10m)</div><div class="chart-wrap-sm"><canvas id="burnSession-${id}"></canvas></div></div>
-    <div class="chart-box"><div class="chart-title">📅 Weekly (7d Window)</div><div class="chart-wrap"><canvas id="weekly-${id}"></canvas></div></div>
-    <div class="chart-box"><div class="chart-title">🔥 Weekly Burn Rate (%/h)</div><div class="chart-wrap-sm"><canvas id="burnWeekly-${id}"></canvas></div></div>`;
-  if (hasSonnet) {
-    cardsHtml += `
-    <div class="chart-box"><div class="chart-title">💎 Sonnet (Weekly)</div><div class="chart-wrap"><canvas id="sonnet-${id}"></canvas></div></div>
-    <div class="chart-box"><div class="chart-title">🔥 Sonnet Burn Rate (%/h)</div><div class="chart-wrap-sm"><canvas id="burnSonnet-${id}"></canvas></div></div>`;
-  }
-  if (hasExtra) {
-    cardsHtml += `
-    <div class="chart-box"><div class="chart-title">💰 Extra Usage (Monthly)</div><div class="chart-wrap"><canvas id="extra-${id}"></canvas></div></div>`;
   }
 
   tab.innerHTML = cardsHtml;
@@ -322,7 +401,15 @@ keys.forEach((key, idx) => {
 
   // ── Alerts ──
   const alerts = [];
-  if (L.seven_day_resets) {
+  if (health.latestError && (health.unhealthy || (health.latestSuccess && tsMs(health.latestError.ts) > tsMs(health.latestSuccess.ts)))) {
+    const lastGood = health.latestSuccess ? agoShort(health.latestSuccess.ts) + ' ago' : 'none in the current history window';
+    if (g.service === 'claude') {
+      alerts.push('Claude collector issue: ' + humanizeError(health.latestError.error) + '. Last successful Claude sample: ' + lastGood);
+    } else {
+      alerts.push(humanizeError(health.latestError.error) + '. Last successful sample: ' + lastGood);
+    }
+  }
+  if (L && L.seven_day_resets) {
     const resetMs = new Date(L.seven_day_resets).getTime();
     const sampleMs = new Date(L.ts).getTime();
     const windowMs = 168 * 3600000;
@@ -330,69 +417,69 @@ keys.forEach((key, idx) => {
     const linearPace = Math.max(0, Math.min(100, elapsed / windowMs * 100));
     if (L.seven_day > linearPace) alerts.push('Weekly at '+L.seven_day+'% — above pace ('+linearPace.toFixed(0)+'%)');
   }
-  if (L.seven_day >= 90) alerts.push('Weekly usage at '+L.seven_day+'%');
-  if (L.five_hour >= 90) alerts.push('Session usage at '+L.five_hour+'%');
+  if (L && L.seven_day >= 90) alerts.push('Weekly usage at '+L.seven_day+'%');
+  if (L && L.five_hour >= 90) alerts.push('Session usage at '+L.five_hour+'%');
   if (alerts.length) {
     document.getElementById('alert-text-'+id).textContent = alerts.join(' · ');
     document.getElementById('alert-'+id).className = 'alert show';
   }
 
   // ── Stats ──
-  const rec = data.filter(d=>d.seven_day!=null).slice(-12);
-  if (rec.length >= 2) {
-    const hrs = (new Date(rec[rec.length-1].ts)-new Date(rec[0].ts))/3600000;
-    const delta = rec[rec.length-1].seven_day-rec[0].seven_day;
-    const rate = hrs > 0 ? delta/hrs : 0;
-    const burnEl = document.getElementById('burn-'+id);
-    burnEl.textContent = rate.toFixed(2)+'%/h';
-    burnEl.className = 'sv '+cls(rate*168>100?80:rate*24>5?50:0);
-    const exhaustEl = document.getElementById('exhaust-'+id);
-    if (rate > 0 && L.seven_day!=null) {
-      const hLeft = (100-L.seven_day)/rate;
-      exhaustEl.textContent = hLeft > 168 ? 'Never (within reset)' : new Date(Date.now()+hLeft*3600000).toLocaleDateString('en-GB',{weekday:'short',hour:'2-digit',minute:'2-digit'});
-      exhaustEl.className = 'sv '+(hLeft<24?'red':hLeft<72?'yellow':'green');
-    } else { exhaustEl.textContent = 'No burn'; exhaustEl.className = 'sv green'; }
-  }
-  const validFh = data.filter(d=>d.five_hour!=null).map(d=>d.five_hour);
-  const peakFh = validFh.length ? Math.max(...validFh) : 0;
-  const peakEl = document.getElementById('peak-'+id);
-  peakEl.textContent = peakFh+'%';
-  peakEl.className = 'sv '+cls(peakFh);
-  document.getElementById('reset-'+id).textContent = ttl(L.seven_day_resets);
-
-  // ── Usage charts ──
-  makeUsageChart(document.getElementById('session-'+id), data, L.five_hour_resets, 5, 'five_hour', p.session[0], p.session[1]);
-  makeUsageChart(document.getElementById('weekly-'+id), data, L.seven_day_resets, 168, 'seven_day', p.weekly[0], p.weekly[1]);
-  if (hasSonnet) {
-    makeUsageChart(document.getElementById('sonnet-'+id), data, L.seven_day_resets, 168, 'sonnet', p.sonnet[0], p.sonnet[1]);
-  }
-
-  // ── Burn rates ──
-  const rates = [];
-  for (let i=1;i<data.length;i++) {
-    const dt=(new Date(data[i].ts)-new Date(data[i-1].ts))/3600000;
-    if(dt<0.05 || dt>0.5)continue;
-    const s0=data[i-1].five_hour, s1=data[i].five_hour;
-    const sDelta = (s0!=null && s1!=null && s1>=s0) ? s1-s0 : 0;
-    const w0=data[i-1].seven_day, w1=data[i].seven_day;
-    const wDelta = (w0!=null && w1!=null) ? w1-w0 : 0;
-    const r = {ts:data[i].ts, session: sDelta, weekly: wDelta > 0 ? wDelta/dt : 0};
-    if (hasSonnet) {
-      const n0=data[i-1].sonnet, n1=data[i].sonnet;
-      const snDelta = (n0!=null && n1!=null) ? n1-n0 : 0;
-      r.sonnet = snDelta > 0 ? snDelta/dt : 0;
+  if (L) {
+    const rec = data.filter(d=>d.seven_day!=null).slice(-12);
+    if (rec.length >= 2) {
+      const hrs = (new Date(rec[rec.length-1].ts)-new Date(rec[0].ts))/3600000;
+      const delta = rec[rec.length-1].seven_day-rec[0].seven_day;
+      const rate = hrs > 0 ? delta/hrs : 0;
+      const burnEl = document.getElementById('burn-'+id);
+      burnEl.textContent = rate.toFixed(2)+'%/h';
+      burnEl.className = 'sv '+cls(rate*168>100?80:rate*24>5?50:0);
+      const exhaustEl = document.getElementById('exhaust-'+id);
+      if (rate > 0 && L.seven_day!=null) {
+        const hLeft = (100-L.seven_day)/rate;
+        exhaustEl.textContent = hLeft > 168 ? 'Never (within reset)' : new Date(Date.now()+hLeft*3600000).toLocaleDateString('en-GB',{weekday:'short',hour:'2-digit',minute:'2-digit'});
+        exhaustEl.className = 'sv '+(hLeft<24?'red':hLeft<72?'yellow':'green');
+      } else { exhaustEl.textContent = 'No burn'; exhaustEl.className = 'sv green'; }
     }
-    rates.push(r);
-  }
+    const validFh = data.filter(d=>d.five_hour!=null).map(d=>d.five_hour);
+    const peakFh = validFh.length ? Math.max(...validFh) : 0;
+    const peakEl = document.getElementById('peak-'+id);
+    peakEl.textContent = peakFh+'%';
+    peakEl.className = 'sv '+cls(peakFh);
+    document.getElementById('reset-'+id).textContent = ttl(L.seven_day_resets);
 
-  makeBurnChart(document.getElementById('burnSession-'+id), data, L.five_hour_resets, 5, rates, 'session', p.session[0], p.session[1], false);
-  makeBurnChart(document.getElementById('burnWeekly-'+id), data, L.seven_day_resets, 168, rates, 'weekly', p.weekly[0], p.weekly[1], true, 'seven_day');
-  if (hasSonnet) {
-    makeBurnChart(document.getElementById('burnSonnet-'+id), data, L.seven_day_resets, 168, rates, 'sonnet', p.sonnet[0], p.sonnet[1], true, 'sonnet');
+    makeUsageChart(document.getElementById('session-'+id), data, L.five_hour_resets, 5, 'five_hour', p.session[0], p.session[1]);
+    makeUsageChart(document.getElementById('weekly-'+id), data, L.seven_day_resets, 168, 'seven_day', p.weekly[0], p.weekly[1]);
+    if (hasSonnet) {
+      makeUsageChart(document.getElementById('sonnet-'+id), data, L.seven_day_resets, 168, 'sonnet', p.sonnet[0], p.sonnet[1]);
+    }
+
+    const rates = [];
+    for (let i=1;i<data.length;i++) {
+      const dt=(new Date(data[i].ts)-new Date(data[i-1].ts))/3600000;
+      if(dt<0.05 || dt>0.5)continue;
+      const s0=data[i-1].five_hour, s1=data[i].five_hour;
+      const sDelta = (s0!=null && s1!=null && s1>=s0) ? s1-s0 : 0;
+      const w0=data[i-1].seven_day, w1=data[i].seven_day;
+      const wDelta = (w0!=null && w1!=null) ? w1-w0 : 0;
+      const r = {ts:data[i].ts, session: sDelta, weekly: wDelta > 0 ? wDelta/dt : 0};
+      if (hasSonnet) {
+        const n0=data[i-1].sonnet, n1=data[i].sonnet;
+        const snDelta = (n0!=null && n1!=null) ? n1-n0 : 0;
+        r.sonnet = snDelta > 0 ? snDelta/dt : 0;
+      }
+      rates.push(r);
+    }
+
+    makeBurnChart(document.getElementById('burnSession-'+id), data, L.five_hour_resets, 5, rates, 'session', p.session[0], p.session[1], false);
+    makeBurnChart(document.getElementById('burnWeekly-'+id), data, L.seven_day_resets, 168, rates, 'weekly', p.weekly[0], p.weekly[1], true, 'seven_day');
+    if (hasSonnet) {
+      makeBurnChart(document.getElementById('burnSonnet-'+id), data, L.seven_day_resets, 168, rates, 'sonnet', p.sonnet[0], p.sonnet[1], true, 'sonnet');
+    }
   }
 
   // ── Extra usage chart ──
-  if (hasExtra) {
+  if (L && hasExtra) {
     const extraData = data.filter(d => d.extra_used != null);
     if (extraData.length) {
       const limit = (L.extra_limit ?? 0) / 100;
@@ -422,23 +509,20 @@ keys.forEach((key, idx) => {
 });
 
 if (keys.length) {
-  const totalPts = Object.values(groups).reduce((s,g) => s+g.data.length, 0);
-  const allData = Object.values(groups).flatMap(g => g.data);
-  const lastTs = allData.reduce((max,d) => d.ts > max ? d.ts : max, '');
-  const lastDate = new Date(lastTs);
+  const totalPts = successEntries.length;
+  const totalErrors = errorEntries.length;
+  const lastEntry = latestEntry(rawEntries);
   const subtitleEl = document.getElementById('subtitle');
   function updateAgo() {
-    const diff = Math.floor((Date.now() - lastDate.getTime()) / 1000);
-    const d = Math.floor(diff / 86400), h = Math.floor((diff % 86400) / 3600), m = Math.floor((diff % 3600) / 60), s = diff % 60;
-    let ago = '';
-    if (d > 0) ago = d + 'd ' + h + 'h';
-    else if (h > 0) ago = h + 'h ' + m + 'm';
-    else ago = (m > 0 ? m + 'm ' : '') + s + 's';
-    subtitleEl.textContent = 'Updated ' + ago + ' ago';
+    if (!lastEntry) {
+      subtitleEl.textContent = 'No collector runs yet';
+      return;
+    }
+    subtitleEl.textContent = 'Latest collector run ' + agoShort(lastEntry.ts) + ' ago';
   }
   updateAgo();
   setInterval(updateAgo, 1000);
-  document.getElementById('footer').textContent = totalPts+' points · __VERSION_PLACEHOLDER__';
+  document.getElementById('footer').textContent = totalPts + ' samples · ' + totalErrors + ' errors · __VERSION_PLACEHOLDER__';
 }
 // Auto-reload more aggressively for file:// because we cannot poll file mtimes there.
 const pageLoadTime = Date.now();
