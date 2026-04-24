@@ -97,6 +97,32 @@ function latestEntry(entries) {
   if (!entries.length) return null;
   return entries.reduce((latest, entry) => tsMs(entry.ts) > tsMs(latest.ts) ? entry : latest);
 }
+function isUsageReset(prev, curr, windowH) {
+  if (prev == null || curr == null || curr >= prev) return false;
+  const drop = prev - curr;
+  if (windowH <= 5) return drop >= 2 || (prev >= 10 && drop >= prev * 0.2);
+  return drop >= Math.max(5, prev * 0.25) || (prev <= 10 && curr <= 1 && drop >= 2);
+}
+function usageCycleWindow(data, resetTs, windowH, field) {
+  if (!resetTs) return null;
+  const end = new Date(resetTs);
+  const hardStart = new Date(end - windowH*3600000);
+  const points = data
+    .filter(d => d[field] != null)
+    .filter(d => { const t = new Date(d.ts); return t >= hardStart && t <= end; })
+    .sort((a,b) => tsMs(a.ts) - tsMs(b.ts));
+  let cycleStart = hardStart;
+  for (let i = 1; i < points.length; i++) {
+    if (isUsageReset(points[i-1][field], points[i][field], windowH)) {
+      cycleStart = new Date(points[i].ts);
+    }
+  }
+  return {
+    start: cycleStart,
+    end,
+    data: points.filter(d => new Date(d.ts) >= cycleStart)
+  };
+}
 function agoShort(iso) {
   if (!iso) return 'never';
   const diff = Math.max(0, Math.floor((Date.now() - tsMs(iso)) / 1000));
@@ -155,9 +181,9 @@ function xScale7d(start, end) {
 }
 
 function makeUsageChart(canvas, data, resetTs, windowH, field, color, bgColor) {
-  if (!resetTs) return;
-  const end = new Date(resetTs), start = new Date(end - windowH*3600000);
-  const filtered = data.filter(d => { const t = new Date(d.ts); return t >= start && t <= end; });
+  const cycle = usageCycleWindow(data, resetTs, windowH, field);
+  if (!cycle) return;
+  const {start, end, data: filtered} = cycle;
   const xScales = windowH <= 5 ? xScale5h(start, end) : xScale7d(start, end);
   new Chart(canvas, {
     type:'line', data: {
@@ -171,11 +197,12 @@ function makeUsageChart(canvas, data, resetTs, windowH, field, color, bgColor) {
 }
 
 function makeBurnChart(canvas, data, resetTs, windowH, rateData, field, color, bgColor, doHourly, rawField) {
-  if (!resetTs) return;
-  const end = new Date(resetTs), start = new Date(end - windowH*3600000);
+  const cycle = usageCycleWindow(data, resetTs, windowH, rawField || field);
+  if (!cycle) return;
+  const {start, end, data: cycleData} = cycle;
   let labels, values;
   if (doHourly) {
-    const inWindow = data.filter(d => { const t = new Date(d.ts); return t >= start && t <= end && d[rawField] != null; });
+    const inWindow = cycleData.filter(d => d[rawField] != null);
     const hourBins = {};
     inWindow.forEach(d => { const t = new Date(d.ts); t.setMinutes(0,0,0); const k = t.getTime(); hourBins[k] = d[rawField]; });
     const hours = Object.keys(hourBins).map(Number).sort((a,b)=>a-b);
@@ -238,6 +265,7 @@ Object.keys(groups).forEach(key => {
     delete groups[key];
   }
 });
+Object.values(groups).forEach(g => g.data.sort((a,b) => tsMs(a.ts) - tsMs(b.ts)));
 
 const serviceStates = {};
 const services = new Set([
@@ -426,7 +454,9 @@ keys.forEach((key, idx) => {
 
   // ── Stats ──
   if (L) {
-    const rec = data.filter(d=>d.seven_day!=null).slice(-12);
+    const weeklyCycle = usageCycleWindow(data, L.seven_day_resets, 168, 'seven_day');
+    const sessionCycle = usageCycleWindow(data, L.five_hour_resets, 5, 'five_hour');
+    const rec = (weeklyCycle ? weeklyCycle.data : data.filter(d=>d.seven_day!=null)).slice(-12);
     if (rec.length >= 2) {
       const hrs = (new Date(rec[rec.length-1].ts)-new Date(rec[0].ts))/3600000;
       const delta = rec[rec.length-1].seven_day-rec[0].seven_day;
@@ -437,11 +467,12 @@ keys.forEach((key, idx) => {
       const exhaustEl = document.getElementById('exhaust-'+id);
       if (rate > 0 && L.seven_day!=null) {
         const hLeft = (100-L.seven_day)/rate;
-        exhaustEl.textContent = hLeft > 168 ? 'Never (within reset)' : new Date(Date.now()+hLeft*3600000).toLocaleDateString('en-GB',{weekday:'short',hour:'2-digit',minute:'2-digit'});
+        const resetHours = L.seven_day_resets ? (new Date(L.seven_day_resets)-new Date(L.ts))/3600000 : 168;
+        exhaustEl.textContent = hLeft > resetHours ? 'Never (within reset)' : new Date(Date.now()+hLeft*3600000).toLocaleDateString('en-GB',{weekday:'short',hour:'2-digit',minute:'2-digit'});
         exhaustEl.className = 'sv '+(hLeft<24?'red':hLeft<72?'yellow':'green');
       } else { exhaustEl.textContent = 'No burn'; exhaustEl.className = 'sv green'; }
     }
-    const validFh = data.filter(d=>d.five_hour!=null).map(d=>d.five_hour);
+    const validFh = (sessionCycle ? sessionCycle.data : data.filter(d=>d.five_hour!=null)).map(d=>d.five_hour);
     const peakFh = validFh.length ? Math.max(...validFh) : 0;
     const peakEl = document.getElementById('peak-'+id);
     peakEl.textContent = peakFh+'%';
