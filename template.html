@@ -155,13 +155,9 @@ function isAuthRelatedError(service, code) {
 }
 const isFile = location.protocol === 'file:';
 function refreshPage() {
-  if (isFile) {
-    const nextUrl = new URL(location.href);
-    nextUrl.searchParams.set('_ts', String(Date.now()));
-    location.replace(nextUrl.href);
-    return;
-  }
-  location.reload();
+  const nextUrl = new URL(location.href);
+  nextUrl.searchParams.set('_ts', String(Date.now()));
+  location.replace(nextUrl.href);
 }
 
 // ── Chart config ──
@@ -323,11 +319,19 @@ function tabLabel(g) {
 // ── Build tabs and content ──
 const tabsEl = document.getElementById('tabs');
 const contentEl = document.getElementById('content');
+const activeTabStorageKey = 'usage-dashboard-active-tab';
 
 function switchTab(key) {
   document.querySelectorAll('.tab-btn').forEach(b => b.classList.toggle('active', b.dataset.key === key));
   document.querySelectorAll('.tab-content').forEach(t => t.classList.toggle('active', t.id === 'tab-'+esc(key)));
+  try { localStorage.setItem(activeTabStorageKey, key); } catch {}
 }
+
+let initialTabKey = keys[0] || '';
+try {
+  const savedTabKey = localStorage.getItem(activeTabStorageKey);
+  if (savedTabKey && keys.includes(savedTabKey)) initialTabKey = savedTabKey;
+} catch {}
 
 keys.forEach((key, idx) => {
   const g = groups[key];
@@ -340,7 +344,7 @@ keys.forEach((key, idx) => {
 
   // Tab button
   const btn = document.createElement('button');
-  btn.className = 'tab-btn' + (idx === 0 ? ' active' : '') + (health.unhealthy ? ' unhealthy' : '');
+  btn.className = 'tab-btn' + (key === initialTabKey ? ' active' : '') + (health.unhealthy ? ' unhealthy' : '');
   btn.textContent = tabLabel(g);
   btn.dataset.key = key;
   btn.onclick = () => switchTab(key);
@@ -349,7 +353,7 @@ keys.forEach((key, idx) => {
   // Tab content
   const tab = document.createElement('div');
   tab.id = 'tab-' + id;
-  tab.className = 'tab-content' + (idx === 0 ? ' active' : '');
+  tab.className = 'tab-content' + (key === initialTabKey ? ' active' : '');
 
   // Build cards HTML
   let cardsHtml = `<div class="alert" id="alert-${id}">⚠️ <span id="alert-text-${id}"></span></div>`;
