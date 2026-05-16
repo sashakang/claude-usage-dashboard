@@ -97,31 +97,17 @@ function latestEntry(entries) {
   if (!entries.length) return null;
   return entries.reduce((latest, entry) => tsMs(entry.ts) > tsMs(latest.ts) ? entry : latest);
 }
-function isUsageReset(prev, curr, windowH) {
-  if (prev == null || curr == null || curr >= prev) return false;
-  const drop = prev - curr;
-  if (windowH <= 5) return drop >= 2 || (prev >= 10 && drop >= prev * 0.2);
-  return drop >= Math.max(5, prev * 0.25) || (prev <= 10 && curr <= 1 && drop >= 2);
-}
 function usageCycleWindow(data, resetTs, windowH, field) {
   if (!resetTs) return null;
   const end = new Date(resetTs);
-  const hardStart = new Date(end - windowH*3600000);
+  const start = new Date(end - windowH*3600000);
+  const targetMs = end.getTime();
+  const resetsField = windowH <= 5 ? 'five_hour_resets' : 'seven_day_resets';
   const points = data
-    .filter(d => d[field] != null)
-    .filter(d => { const t = new Date(d.ts); return t >= hardStart && t <= end; })
+    .filter(d => d[field] != null && d[resetsField] && new Date(d[resetsField]).getTime() === targetMs)
+    .filter(d => { const t = new Date(d.ts); return t >= start && t <= end; })
     .sort((a,b) => tsMs(a.ts) - tsMs(b.ts));
-  let cycleStart = hardStart;
-  for (let i = 1; i < points.length; i++) {
-    if (isUsageReset(points[i-1][field], points[i][field], windowH)) {
-      cycleStart = new Date(points[i].ts);
-    }
-  }
-  return {
-    start: cycleStart,
-    end,
-    data: points.filter(d => new Date(d.ts) >= cycleStart)
-  };
+  return { start, end, data: points };
 }
 function agoShort(iso) {
   if (!iso) return 'never';
@@ -139,19 +125,25 @@ function humanizeError(code) {
     claude_usage_http_403: 'Claude usage request was rejected with 403',
     claude_usage_null_after_retries: 'Claude usage endpoint returned no usable data after retries',
     codex_auth_read_failed: 'Codex auth token could not be read',
+    codex_token_invalidated: 'Codex session was invalidated — run `codex login` (likely signed into another account elsewhere)',
     codex_api_failed_after_retries: 'Codex usage endpoint returned no usable data after retries',
     codex_parse_failed: 'Codex usage response could not be parsed',
   };
   return map[code] || code.replaceAll('_', ' ');
 }
 function isAuthRelatedError(service, code) {
-  if (service !== 'claude') return false;
-  return [
-    'claude_session_missing',
-    'claude_session_expired',
-    'claude_usage_http_401',
-    'claude_usage_http_403'
-  ].includes(code);
+  if (service === 'claude') {
+    return [
+      'claude_session_missing',
+      'claude_session_expired',
+      'claude_usage_http_401',
+      'claude_usage_http_403'
+    ].includes(code);
+  }
+  if (service === 'codex') {
+    return ['codex_auth_read_failed', 'codex_token_invalidated'].includes(code);
+  }
+  return false;
 }
 const isFile = location.protocol === 'file:';
 function refreshPage() {
