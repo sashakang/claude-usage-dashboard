@@ -102,9 +102,10 @@ function usageCycleWindow(data, resetTs, windowH, field) {
   const end = new Date(resetTs);
   const start = new Date(end - windowH*3600000);
   const targetMs = end.getTime();
+  const resetToleranceMs = 2 * 60 * 1000;
   const resetsField = windowH <= 5 ? 'five_hour_resets' : 'seven_day_resets';
   const points = data
-    .filter(d => d[field] != null && d[resetsField] && new Date(d[resetsField]).getTime() === targetMs)
+    .filter(d => d[field] != null && d[resetsField] && Math.abs(new Date(d[resetsField]).getTime() - targetMs) <= resetToleranceMs)
     .filter(d => { const t = new Date(d.ts); return t >= start && t <= end; })
     .sort((a,b) => tsMs(a.ts) - tsMs(b.ts));
   return { start, end, data: points };
